@@ -1,0 +1,286 @@
+<meta charset="utf-8" />
+<title>BANANA — OBJECTIVE EVIDENCE</title>
+<style>
+  :root{
+    --bg:#05070c; --panel:#0a0d14; --header:#12151d;
+    --amber:#FFA500; --amber2:#CC8400; --dim:#7c6a3a; --bright:#FFCB52;
+    --pos:#28ff7a; --neg:#ff4d4d; --neu:#38d6ff; --warn:#FFD700; --grid:#1a1e26;
+    --border:#262b35; --mono:'JetBrains Mono','IBM Plex Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--bg);color:var(--amber);font-family:var(--mono);font-size:12px;line-height:1.4}
+  body{padding:0 0 40px}
+  a{color:var(--neu)}
+  #top{position:sticky;top:0;z-index:5;background:var(--header);border-bottom:1px solid var(--border);
+    padding:6px 14px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+  #top .t{color:var(--bright);font-size:13px;letter-spacing:1px}
+  #top .m{color:var(--amber2);font-size:11px} #top .m b{color:var(--bright)}
+  #top .neg{color:var(--neg)} #top .pos{color:var(--pos)} #top .neu{color:var(--neu)}
+  .verdict{margin:12px 14px;padding:10px 14px;border:1px solid var(--border);background:#0a0d14;
+    display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .verdict .col b{color:var(--bright)}
+  .verdict .lead{color:var(--warn)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 14px}
+  .full{grid-column:1 / -1}
+  .card{border:1px solid var(--border);background:var(--panel)}
+  .card .ph{background:var(--header);padding:4px 10px;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center}
+  .card .ph .h{color:var(--bright);font-size:12px} .card .ph .k{color:var(--dim);font-size:10px}
+  .card .cap{padding:6px 10px;color:var(--amber2);font-size:10.5px;line-height:1.5;border-top:1px dotted #1c2029}
+  .card .cap b{color:var(--warn)} .card .cap .g{color:var(--pos)} .card .cap .r{color:var(--neg)}
+  svg{display:block;width:100%;height:auto}
+  .ax{stroke:var(--grid);stroke-width:1}
+  .axline{stroke:#3a4150;stroke-width:1}
+  .axt{fill:var(--dim);font-size:10px;font-family:var(--mono)}
+  .lbl{fill:var(--amber2);font-size:10px;font-family:var(--mono)}
+  .foot{padding:14px;color:var(--dim);font-size:10px}
+  @media(max-width:820px){.grid,.verdict{grid-template-columns:1fr}}
+</style>
+
+<div id="top">
+  <span class="t">BANANA · OBJECTIVE EVIDENCE</span>
+  <span class="m">Q: バナナ価格は米国ETFの来月リターンを予測できるか</span>
+  <span class="m" id="mIc"></span>
+  <span class="m" id="mP"></span>
+  <span class="m" id="mN"></span>
+  <span class="m"><a href="/">← GLOBE</a></span>
+</div>
+
+<div class="verdict">
+  <div class="col">
+    <div class="lead">■ シグナルの検定（客観的結論）</div>
+    <div id="vSignal">…</div>
+  </div>
+  <div class="col">
+    <div class="lead">■ 実現リターン（正直な但し書き）</div>
+    <div id="vReturn">…</div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card full">
+    <div class="ph"><span class="h">█ 1. IC 並べ替え帰無分布 — 決定的な1枚</span><span class="k">PERMUTATION TEST</span></div>
+    <svg id="cPerm" viewBox="0 0 1120 300"></svg>
+    <div class="cap" id="capPerm"></div>
+  </div>
+
+  <div class="card">
+    <div class="ph"><span class="h">█ 2. 予測 vs 実測 散布</span><span class="k">POOLED SCATTER</span></div>
+    <svg id="cScatter" viewBox="0 0 560 360"></svg>
+    <div class="cap" id="capScatter"></div>
+  </div>
+
+  <div class="card">
+    <div class="ph"><span class="h">█ 3. ローリング12M IC ± 95%帯</span><span class="k">ROLLING IC</span></div>
+    <svg id="cRoll" viewBox="0 0 560 360"></svg>
+    <div class="cap" id="capRoll"></div>
+  </div>
+
+  <div class="card full">
+    <div class="ph"><span class="h">█ 4. エクイティ曲線 vs ランダム戦略ファン</span><span class="k">EQUITY / RANDOM NULL · LOG</span></div>
+    <svg id="cEquity" viewBox="0 0 1120 360"></svg>
+    <div class="cap" id="capEquity"></div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+const C={amber:'#FFA500',amber2:'#CC8400',dim:'#7c6a3a',bright:'#FFCB52',
+  pos:'#28ff7a',neg:'#ff4d4d',neu:'#38d6ff',warn:'#FFD700',grid:'#1a1e26'};
+
+fetch('evidence.json').then(r=>r.json()).then(draw).catch(e=>{
+  document.getElementById('foot').textContent='evidence.json load error: '+e;
+});
+
+function draw(E){
+  const ic=E.ic, meta=E.meta;
+  document.getElementById('mIc').innerHTML=`IC <b>${ic.mean>=0?'+':''}${ic.mean.toFixed(4)}</b>`;
+  document.getElementById('mP').innerHTML=`p(perm) <span class="neg">${ic.p_perm.toFixed(3)}</span> · p(t) <span class="neg">${ic.p_ttest.toFixed(3)}</span>`;
+  document.getElementById('mN').innerHTML=`n=${meta.n_months}mo · ${meta.period[0]}→${meta.period[1]}`;
+
+  document.getElementById('vSignal').innerHTML=
+    `月次クロスセクションIC = <b>+${ic.mean.toFixed(4)}</b>（ほぼ0）。<br>`+
+    `並べ替え検定 <b>p=${ic.p_perm.toFixed(3)}</b>、実測は帰無分布の<b>${ic.pctile.toFixed(0)}</b>パーセンタイル。<br>`+
+    `散布図の相関 r=<b>${E.scatter.r.toFixed(3)}</b>（p=${E.scatter.p.toFixed(2)}）。<br>`+
+    `→ <span style="color:${C.neg}">バナナに各月のETFを順位付けする有意な予測力は無い。</span>`;
+
+  const eq=E.equity, top=eq.strategies.TOP3_LONG, spy=eq.strategies.SPY_BH;
+  document.getElementById('vReturn').innerHTML=
+    `TOP3累積 <b>${top[top.length-1].toFixed(1)}x</b> / SPY ${spy[spy.length-1].toFixed(1)}x / `+
+    `ランダム中央値 ${eq.random.p50[eq.random.p50.length-1].toFixed(1)}x。<br>`+
+    `リターンはランダム500本の<b>${eq.random.final_pctile.toFixed(0)}</b>パーセンタイル。<br>`+
+    `→ <span style="color:${C.warn}">派手だが、これは1本の実現経路。ICが有意でない以上、</span>`+
+    `<span style="color:${C.warn}">少数銘柄(GLD/テック)集中による運と統計的に区別できない。</span>`;
+
+  drawPerm(E); drawScatter(E); drawRoll(E); drawEquity(E);
+
+  document.getElementById('foot').innerHTML=
+    `SOURCE: predictions.parquet (${meta.n_obs} obs), backtest_results.parquet, `+
+    `permutation N=${meta.n_perm}, random strategies N=${meta.n_random}. `+
+    `すべて実データ由来・決定論的(seed=42)。装飾ゼロ・3Dゼロ・盛りゼロ。`;
+}
+
+function axis(svg,x,y,W,H,pad){ // returns inner box
+  return {l:pad.l,r:W-pad.r,t:pad.t,b:H-pad.b,iw:W-pad.l-pad.r,ih:H-pad.t-pad.b};
+}
+function S(id){const s=d3.select('#'+id); s.selectAll('*').remove(); return s;}
+
+// ---- 1. PERMUTATION NULL ----
+function drawPerm(E){
+  const W=1120,H=300,pad={l:60,r:30,t:20,b:40};
+  const svg=S('cPerm'); const b=axis(svg,0,0,W,H,pad);
+  const null_=E.perm.null, actual=E.perm.actual;
+  const ext=d3.max([Math.abs(d3.min(null_)),Math.abs(d3.max(null_)),Math.abs(actual)])*1.1;
+  const x=d3.scaleLinear().domain([-ext,ext]).range([b.l,b.r]);
+  const bins=d3.bin().domain(x.domain()).thresholds(46)(null_);
+  const y=d3.scaleLinear().domain([0,d3.max(bins,d=>d.length)]).range([b.b,b.t]);
+  // shaded |x|>=|actual| region (as-extreme-or-more)
+  const ax=Math.abs(actual);
+  [[-ext,-ax],[ax,ext]].forEach(([x0,x1])=>{
+    svg.append('rect').attr('x',x(x0)).attr('width',Math.max(0,x(x1)-x(x0)))
+      .attr('y',b.t).attr('height',b.b-b.t).attr('fill',C.neg).attr('opacity',0.08);
+  });
+  // bars
+  svg.selectAll('rect.bar').data(bins).join('rect').attr('class','bar')
+    .attr('x',d=>x(d.x0)+0.5).attr('width',d=>Math.max(0,x(d.x1)-x(d.x0)-1))
+    .attr('y',d=>y(d.length)).attr('height',d=>b.b-y(d.length))
+    .attr('fill',C.dim).attr('opacity',0.85);
+  // zero line
+  svg.append('line').attr('x1',x(0)).attr('x2',x(0)).attr('y1',b.t).attr('y2',b.b)
+    .attr('stroke',C.grid).attr('stroke-dasharray','2 3');
+  // actual marker
+  svg.append('line').attr('x1',x(actual)).attr('x2',x(actual)).attr('y1',b.t-4).attr('y2',b.b)
+    .attr('stroke',C.amber).attr('stroke-width',2);
+  svg.append('polygon').attr('points',`${x(actual)-5},${b.t-4} ${x(actual)+5},${b.t-4} ${x(actual)},${b.t+4}`)
+    .attr('fill',C.amber);
+  svg.append('text').attr('x',x(actual)+8).attr('y',b.t+8).attr('class','lbl')
+    .attr('fill',C.bright).text(`実測 IC = +${actual.toFixed(4)}  (${E.ic.pctile.toFixed(0)}%ile)`);
+  // x axis
+  x.ticks(9).forEach(t=>{
+    svg.append('line').attr('x1',x(t)).attr('x2',x(t)).attr('y1',b.b).attr('y2',b.b+4).attr('class','axline');
+    svg.append('text').attr('x',x(t)).attr('y',b.b+16).attr('text-anchor','middle').attr('class','axt').text(t.toFixed(2));
+  });
+  svg.append('text').attr('x',(b.l+b.r)/2).attr('y',H-6).attr('text-anchor','middle').attr('class','axt')
+    .text('ランダム予測（バナナ無情報）を並べ替えて得た平均月次ICの分布 →');
+  svg.append('text').attr('x',b.l-46).attr('y',(b.t+b.b)/2).attr('class','axt')
+    .attr('transform',`rotate(-90 ${b.l-46} ${(b.t+b.b)/2})`).attr('text-anchor','middle').text('頻度');
+  document.getElementById('capPerm').innerHTML=
+    `実測ICの矢印は分布の<b>ど真ん中</b>（${E.ic.pctile.toFixed(0)}パーセンタイル）。`+
+    `赤い薄帯＝「実測と同等以上に極端」な割合＝<b>p=${E.ic.p_perm.toFixed(3)}</b>。`+
+    `<span class="r">でたらめ予測と区別がつかない＝予測力の証拠なし。</span>`;
+}
+
+// ---- 2. SCATTER ----
+function drawScatter(E){
+  const W=560,H=360,pad={l:52,r:16,t:16,b:44};
+  const svg=S('cScatter'); const b=axis(svg,0,0,W,H,pad);
+  const pts=E.scatter.points;
+  const xe=d3.max(pts,d=>Math.abs(d[0]))*1.05, ye=d3.max(pts,d=>Math.abs(d[1]))*1.05;
+  const x=d3.scaleLinear().domain([-xe,xe]).range([b.l,b.r]);
+  const y=d3.scaleLinear().domain([-ye,ye]).range([b.b,b.t]);
+  // quadrant lines
+  svg.append('line').attr('x1',x(0)).attr('x2',x(0)).attr('y1',b.t).attr('y2',b.b).attr('stroke',C.grid);
+  svg.append('line').attr('x1',b.l).attr('x2',b.r).attr('y1',y(0)).attr('y2',y(0)).attr('stroke',C.grid);
+  // points
+  svg.append('g').selectAll('rect').data(pts).join('rect')
+    .attr('x',d=>x(d[0])-1).attr('y',d=>y(d[1])-1).attr('width',2).attr('height',2)
+    .attr('fill',C.neu).attr('opacity',0.35);
+  // regression line
+  const s=E.scatter.slope,i=E.scatter.intercept;
+  svg.append('line').attr('x1',x(-xe)).attr('y1',y(s*-xe+i)).attr('x2',x(xe)).attr('y2',y(s*xe+i))
+    .attr('stroke',C.amber).attr('stroke-width',1.5);
+  svg.append('text').attr('x',b.r-6).attr('y',b.t+14).attr('text-anchor','end').attr('class','lbl')
+    .attr('fill',C.bright).text(`r=${E.scatter.r.toFixed(3)}  slope=${s.toFixed(3)}`);
+  // axes
+  [ -Math.round(xe*100)/100,0,Math.round(xe*100)/100].forEach(t=>{
+    svg.append('text').attr('x',x(t)).attr('y',b.b+16).attr('text-anchor','middle').attr('class','axt').text(t.toFixed(2));});
+  [ -Math.round(ye*100)/100,0,Math.round(ye*100)/100].forEach(t=>{
+    svg.append('text').attr('x',b.l-6).attr('y',y(t)+3).attr('text-anchor','end').attr('class','axt').text(t.toFixed(2));});
+  svg.append('text').attr('x',(b.l+b.r)/2).attr('y',H-6).attr('text-anchor','middle').attr('class','axt').text('予測リターン');
+  svg.append('text').attr('x',b.l-40).attr('y',(b.t+b.b)/2).attr('class','axt')
+    .attr('transform',`rotate(-90 ${b.l-40} ${(b.t+b.b)/2})`).attr('text-anchor','middle').text('実測リターン');
+  document.getElementById('capScatter').innerHTML=
+    `全 ${E.meta.n_obs} 観測。回帰線はほぼ水平、点群は<b>丸い雲</b>。`+
+    `<span class="r">予測と実測に関係が見えない（r≈0）。</span>`;
+}
+
+// ---- 3. ROLLING IC ----
+function drawRoll(E){
+  const W=560,H=360,pad={l:52,r:16,t:16,b:44};
+  const svg=S('cRoll'); const b=axis(svg,0,0,W,H,pad);
+  const r=E.rolling, n=r.length;
+  const x=d3.scaleLinear().domain([0,n-1]).range([b.l,b.r]);
+  const ally=r.flatMap(d=>[d.ic+d.band,d.ic-d.band]);
+  const ye=d3.max(ally,Math.abs)*1.1;
+  const y=d3.scaleLinear().domain([-ye,ye]).range([b.b,b.t]);
+  // band ribbon (ic +/- 95%)
+  const area=d3.area().x((d,i)=>x(i)).y0(d=>y(d.ic-d.band)).y1(d=>y(d.ic+d.band));
+  svg.append('path').datum(r).attr('d',area).attr('fill',C.neu).attr('opacity',0.12);
+  // zero line
+  svg.append('line').attr('x1',b.l).attr('x2',b.r).attr('y1',y(0)).attr('y2',y(0))
+    .attr('stroke','#3a4150').attr('stroke-width',1);
+  // ic line
+  const line=d3.line().x((d,i)=>x(i)).y(d=>y(d.ic));
+  svg.append('path').datum(r).attr('d',line).attr('fill','none').attr('stroke',C.amber).attr('stroke-width',1.4);
+  // y ticks
+  [-Math.round(ye*100)/100,0,Math.round(ye*100)/100].forEach(t=>{
+    svg.append('text').attr('x',b.l-6).attr('y',y(t)+3).attr('text-anchor','end').attr('class','axt').text(t.toFixed(2));});
+  // x year ticks
+  r.forEach((d,i)=>{ if(d.ym.endsWith('-01')){
+    svg.append('line').attr('x1',x(i)).attr('x2',x(i)).attr('y1',b.b).attr('y2',b.b+3).attr('class','axline');
+    svg.append('text').attr('x',x(i)).attr('y',b.b+16).attr('text-anchor','middle').attr('class','axt').text(d.ym.slice(0,4));}});
+  svg.append('text').attr('x',b.r-4).attr('y',b.t+12).attr('text-anchor','end').attr('class','lbl').text('12M rolling IC ±95%');
+  document.getElementById('capRoll').innerHTML=
+    `ローリングICは<b>0の線</b>を何度も跨ぐ。95%帯（シアン）はほぼ常に0を含む。`+
+    `<span class="r">どの区間でも有意な予測力は立たない。</span>`;
+}
+
+// ---- 4. EQUITY ----
+function drawEquity(E){
+  const W=1120,H=360,pad={l:56,r:120,t:18,b:40};
+  const svg=S('cEquity'); const b=axis(svg,0,0,W,H,pad);
+  const eq=E.equity, d=eq.dates, n=d.length;
+  const x=d3.scaleLinear().domain([0,n-1]).range([b.l,b.r]);
+  const series=[
+    {k:'random_band'},
+    {k:'p50',v:eq.random.p50,c:C.dim,dash:'3 3',name:'RANDOM 中央値'},
+    {k:'60_40',v:eq.strategies['60_40'],c:'#8a7bd8',name:'60/40'},
+    {k:'SPY_BH',v:eq.strategies.SPY_BH,c:C.neu,name:'SPY B&H'},
+    {k:'TOP3_LONG',v:eq.strategies.TOP3_LONG,c:C.amber,name:'TOP3 (BANANA)',w:2.2},
+  ];
+  const allv=[...eq.random.p05,...eq.random.p95,...Object.values(eq.strategies).flat()].filter(v=>v>0);
+  const y=d3.scaleLog().domain([d3.min(allv)*0.9,d3.max(allv)*1.1]).range([b.b,b.t]);
+  // random fan band
+  const area=d3.area().x((_,i)=>x(i)).y0((_,i)=>y(eq.random.p05[i])).y1((_,i)=>y(eq.random.p95[i]));
+  svg.append('path').datum(eq.random.p05).attr('d',area).attr('fill',C.dim).attr('opacity',0.14);
+  // y gridlines 1,2,5,10
+  [1,2,5,10].forEach(t=>{ if(t>=y.domain()[0]&&t<=y.domain()[1]){
+    svg.append('line').attr('x1',b.l).attr('x2',b.r).attr('y1',y(t)).attr('y2',y(t)).attr('stroke',C.grid);
+    svg.append('text').attr('x',b.l-6).attr('y',y(t)+3).attr('text-anchor','end').attr('class','axt').text(t+'x');}});
+  // lines
+  series.filter(s=>s.v).forEach(s=>{
+    const ln=d3.line().x((_,i)=>x(i)).y(v=>y(v));
+    svg.append('path').datum(s.v).attr('d',ln).attr('fill','none').attr('stroke',s.c)
+      .attr('stroke-width',s.w||1.3).attr('stroke-dasharray',s.dash||null);
+  });
+  // legend
+  let ly=b.t+6;
+  series.filter(s=>s.v).forEach(s=>{
+    svg.append('line').attr('x1',b.r+12).attr('x2',b.r+30).attr('y1',ly).attr('y2',ly)
+      .attr('stroke',s.c).attr('stroke-width',s.w||1.3).attr('stroke-dasharray',s.dash||null);
+    svg.append('text').attr('x',b.r+34).attr('y',ly+3).attr('class','axt').attr('fill',s.c).text(s.name);
+    ly+=16;
+  });
+  svg.append('rect').attr('x',b.r+12).attr('y',ly+2).attr('width',18).attr('height',8).attr('fill',C.dim).attr('opacity',0.3);
+  svg.append('text').attr('x',b.r+34).attr('y',ly+10).attr('class','axt').text('RANDOM 5–95%');
+  // x year ticks
+  d.forEach((m,i)=>{ if(m.endsWith('-01')){
+    svg.append('text').attr('x',x(i)).attr('y',b.b+16).attr('text-anchor','middle').attr('class','axt').text(m.slice(0,4));}});
+  document.getElementById('capEquity').innerHTML=
+    `TOP3(琥珀)=<b>${eq.strategies.TOP3_LONG.slice(-1)[0].toFixed(1)}x</b> は SPY もランダム帯も上抜け（${eq.random.final_pctile.toFixed(0)}%ile）。`+
+    `<b>だが</b> これは1経路・GLD/テック集中の産物で、パネル1–3が示す通り<b>ICは有意でない</b>。`+
+    `<span class="r">リターンの見栄えと予測力の有無は別問題——それを同一画面で並置している。</span>`;
+}
+</script>

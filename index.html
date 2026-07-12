@@ -1,0 +1,501 @@
+<meta charset="utf-8" />
+<title>BANANA → CAPITAL — 非営利AIの取引</title>
+<style>
+  :root{
+    --bg:#000; --header:#12131aee; --panel:#080a10cc;
+    --amber:#FFA500; --amber2:#CC8400; --dim:#7c6a3a; --bright:#FFCB52;
+    --pos:#28ff7a; --neg:#ff4d4d; --neu:#38d6ff; --warn:#FFD700;
+    --border:#2a2f3a;
+    --mono:'JetBrains Mono','IBM Plex Mono','Berkeley Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--amber);font-family:var(--mono);
+    font-size:12px;line-height:1.35;overflow:hidden;font-weight:400}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:#000;z-index:60;color:var(--amber2);letter-spacing:2px;font-size:12px}
+  #loading .bar{margin-top:14px;width:220px;height:2px;background:#222}
+  #loading .barfill{height:100%;width:0;background:var(--amber);transition:width .2s}
+
+  #statusbar{position:fixed;top:0;left:0;right:0;height:24px;background:var(--header);
+    border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;
+    padding:0 10px;z-index:20;font-size:11px;color:var(--amber2);backdrop-filter:blur(4px)}
+  #statusbar b{color:var(--bright)} #statusbar .live{color:var(--pos)} #statusbar .sep{color:var(--dim)}
+
+  .panel{position:fixed;background:var(--panel);border:1px solid var(--border);z-index:15;
+    backdrop-filter:blur(6px)}
+  .panel .ph{background:#161922cc;color:var(--bright);padding:3px 8px;font-size:11px;
+    border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .panel .ph .k{color:var(--dim);font-size:10px}
+  .panel .pb{padding:8px}
+  .barmark{color:var(--amber)}
+
+  #verdict{top:34px;left:12px;width:266px}
+  .metric{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #23262e}
+  .metric .lbl{color:var(--dim)} .metric .val{color:var(--amber);font-variant-numeric:tabular-nums}
+  .val.neg{color:var(--neg)} .val.pos{color:var(--pos)} .val.neu{color:var(--neu)}
+  .stamp{margin-top:8px;padding:5px 6px;border:1px solid var(--neg);color:var(--neg);
+    text-align:center;letter-spacing:1px;font-size:11px}
+  .note{margin-top:7px;color:var(--amber2);font-size:10px;line-height:1.5}
+  .note b{color:var(--warn)}
+
+  #controls{top:34px;right:12px;width:224px}
+  .grp{margin-bottom:9px} .grp .gt{color:var(--dim);font-size:10px;margin-bottom:3px;letter-spacing:.5px}
+  .btn{display:block;width:100%;text-align:left;background:transparent;color:var(--amber2);
+    border:1px solid var(--border);padding:4px 7px;font-family:var(--mono);font-size:11px;
+    cursor:pointer;margin-bottom:3px}
+  .btn:hover{border-color:var(--amber);color:var(--amber)}
+  .btn.on{border-color:var(--amber);color:#000;background:var(--amber)}
+  .btn .kx{float:right;color:var(--dim)} .btn.on .kx{color:#000}
+  .gatebox{border:1px solid var(--border);padding:5px 7px;font-size:10px;color:var(--amber2)}
+  .gatebox .st{color:var(--neg)}
+  .led{display:inline-block;width:8px;height:8px;margin-right:6px;vertical-align:middle;border:1px solid #444;background:#200}
+
+  /* timeline right */
+  #timeline{top:214px;right:12px;width:224px;bottom:52px}
+  #timeline .pb{padding:6px 8px;overflow:auto;height:calc(100% - 22px)}
+  .tlrow{display:grid;grid-template-columns:44px 1fr 48px;gap:5px;align-items:center;
+    padding:1px 0;font-size:10px;font-variant-numeric:tabular-nums}
+  .tlrow .m{color:var(--dim)} .tlrow .v{text-align:right}
+  .tlrow.cur{background:#ffcb5222}
+  .tlbar{height:8px;position:relative;background:#181b22}
+  .tlbar i{position:absolute;top:0;bottom:0;display:block}
+  .tlbar i.p{left:50%;background:var(--pos)} .tlbar i.n{right:50%;background:var(--neg)}
+
+  /* legend */
+  #legend{bottom:52px;left:12px;width:266px;max-height:30vh;overflow:auto}
+  #legend table{width:100%;border-collapse:collapse;font-size:10px}
+  #legend td{padding:1px 4px;border-bottom:1px dotted #1c1f27;font-variant-numeric:tabular-nums}
+  #legend .tk{color:var(--bright)} #legend td.r{text-align:right}
+  #legend .held{color:var(--pos)} #legend .miss{color:var(--amber2)}
+
+  #cmd{position:fixed;left:0;right:0;bottom:22px;height:22px;background:#080a10cc;
+    border-top:1px solid var(--border);display:flex;align-items:center;padding:0 10px;
+    color:var(--amber);font-size:11px;z-index:20;backdrop-filter:blur(4px)}
+  #cmd .cursor{display:inline-block;width:7px;height:13px;background:var(--amber);margin-left:3px;
+    animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  #fkeys{position:fixed;left:0;right:0;bottom:0;height:22px;background:var(--header);
+    border-top:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 10px;
+    font-size:10px;color:var(--dim);z-index:20}
+  #fkeys b{color:var(--amber2)}
+
+  .lbl3d{position:fixed;transform:translate(-50%,-100%);font-size:10px;white-space:nowrap;
+    pointer-events:none;z-index:12;text-shadow:0 0 3px #000,0 0 3px #000;color:var(--bright)}
+  .lbl3d.dest{color:var(--neu)} .lbl3d .sub{color:var(--dim);font-size:9px}
+  .lbl3d .dot{display:inline-block;width:4px;height:4px;background:currentColor;margin-right:4px;vertical-align:middle}
+  .hidden{display:none}
+</style>
+
+<div id="loading"><div style="text-align:center">LOADING SATELLITE IMAGERY<div class="bar"><div class="barfill" id="lbar"></div></div></div></div>
+<div id="app"></div>
+
+<div id="statusbar">
+  <span>BANANA-USD <b>1.1574</b> <span class="sep">|</span></span>
+  <span>IC <b>+0.0390</b> <span class="sep">/</span> P <span style="color:var(--neg)">0.227</span> <span class="sep">|</span></span>
+  <span>SIGNAL: <b style="color:var(--neg)">NOISE</b> <span class="sep">|</span></span>
+  <span id="clock"></span><span class="sep">|</span><span class="live">● TRADING</span>
+  <span class="sep">|</span><span style="color:var(--dim)">BANANA → CAPITAL — バナナ価格を学習した非営利AIの取引</span>
+</div>
+
+<div class="panel" id="verdict">
+  <div class="ph"><span><span class="barmark">█</span> ALTERNATIVE AI · 非営利取引</span><span class="k">&lt;CONCEPT&gt;</span></div>
+  <div class="pb">
+    <div class="note" style="margin-top:0">
+      <b>バナナ</b>＝資本主義の歴史を体現する果物（植民地・プランテーション・多国籍資本）。
+      その価格を学習したAIが、資本主義の制度である<b>株式</b>を取引する。<br>
+      南（産地）から北（金融資本）へ——光の流れは<b>資本の移動</b>そのもの。</div>
+    <div class="stamp" style="border-color:var(--warn);color:var(--warn)">PROFIT IS NOT THE OBJECTIVE</div>
+    <div style="color:var(--dim);font-size:10px;margin:8px 0 3px">参考指標（利益の根拠として提示しない）</div>
+    <div class="metric"><span class="lbl">予測 IC / p値</span><span class="val">+0.039 <span class="neg">p=0.227</span></span></div>
+    <div class="metric"><span class="lbl">ペーパー NAV / 損益</span><span class="val pos">1.189x +¥18,940</span></div>
+    <div class="note" style="font-size:10px">このAIは<b>統計的に有意なシグナルを持たない</b>。
+      それでも取引する——利益ではなく<b>思考</b>のために。有意でなさは欠陥ではなく、
+      「儲けを目的化しないAI」の<b>証</b>。 <span style="color:var(--neu)">→ 客観検証: /evidence.html</span></div>
+  </div>
+</div>
+
+<div class="panel" id="controls">
+  <div class="ph"><span><span class="barmark">█</span> CONTROL</span><span class="k">F2-F6</span></div>
+  <div class="pb">
+    <div class="grp"><div class="gt">VIEW</div>
+      <button class="btn on" id="mSource">資本のフロー：産地→資本<span class="kx">F2</span></button>
+      <button class="btn" id="mEtf">AIの判断：ETF配分<span class="kx">F3</span></button></div>
+    <div class="grp"><div class="gt">OVERLAYS</div>
+      <button class="btn" id="oRandom">利益なき選択（ランダム）と比較<span class="kx">F4</span></button>
+      <button class="btn on" id="oArcs">資本フロー（アーク）<span class="kx">F5</span></button>
+      <button class="btn on" id="oRotate">自動回転<span class="kx">F6</span></button></div>
+    <div class="grp"><div class="gt">PROFIT MOTIVE</div>
+      <div class="gatebox"><span class="led" id="gateLed"></span>利益の根拠 <b>p &lt; 0.05</b><br>
+        現在 p = <span class="st">0.227</span> → <span class="st">根拠なし・それでも取引</span></div></div>
+  </div>
+</div>
+
+<div class="panel" id="timeline">
+  <div class="ph"><span><span class="barmark">█</span> CHRONOLOGICAL SUMMARY</span><span class="k" id="tlDate">2026-01</span></div>
+  <div class="pb"><div style="color:var(--dim);font-size:10px;margin-bottom:4px">PAPER NAV / 月次リターン</div>
+    <div id="tlBody"></div></div>
+</div>
+
+<div class="panel" id="legend">
+  <div class="ph"><span><span class="barmark">█</span> <span id="legTitle">FLOW</span></span><span class="k">&lt;LIST&gt;</span></div>
+  <div class="pb"><table id="legTable"></table></div>
+</div>
+
+<div id="cmd">&gt; AI TRADE BANANA→EQUITY | OBJECTIVE=THOUGHT NOT PROFIT | p=0.227 <span style="color:var(--dim)">&lt;GO&gt;</span><span class="cursor"></span></div>
+<div id="fkeys"><span><b>F1</b> HELP</span><span><b>F2</b> SOURCE</span><span><b>F3</b> ETF</span>
+  <span><b>F4</b> RANDOM</span><span><b>F5</b> ARCS</span><span><b>F6</b> ROTATE</span></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ---------------------------------------------------------------- DATA
+const IC=0.039, R=1.0;
+// banana-producing Global South — the colonial/plantation geography of capital
+const EXPORTERS=[
+  {name:'ECUADOR',lat:-1.83,lon:-78.18,share:0.28},
+  {name:'GUATEMALA',lat:15.78,lon:-90.23,share:0.21},
+  {name:'PHILIPPINES',lat:12.88,lon:121.77,share:0.12},
+  {name:'COSTA RICA',lat:9.75,lon:-83.75,share:0.10},
+  {name:'COLOMBIA',lat:4.57,lon:-74.30,share:0.09},
+  {name:'HONDURAS',lat:15.20,lon:-86.24,share:0.06},
+  {name:'PANAMA',lat:8.54,lon:-80.78,share:0.05},
+  {name:'CAMEROON',lat:4.15,lon:9.29,share:0.05},
+  {name:'DOMINICAN R.',lat:18.74,lon:-70.16,share:0.04},
+];
+const WALLST={name:'WALL ST',lat:40.71,lon:-74.01};
+const BANANA_CENTROID={name:'BANANA BELT',lat:8.0,lon:-80.0};
+const ETFS=[
+  {tk:'GLD',name:'GOLD·LONDON',lat:51.51,lon:-0.13,pred:0.165,act:0.035,held:true},
+  {tk:'QQQ',name:'NASDAQ·NY',lat:40.75,lon:-73.98,pred:0.126,act:0.047,held:true},
+  {tk:'XLK',name:'TECH·SANJOSE',lat:37.34,lon:-121.89,pred:0.043,act:0.065,held:true},
+  {tk:'DBA',name:'AGRI·CHICAGO',lat:41.88,lon:-87.63,pred:0.034,act:-0.015,held:false},
+  {tk:'SPY',name:'S&P·NY',lat:40.71,lon:-74.01,pred:-0.188,act:0.024,held:false},
+  {tk:'XLP',name:'STAPLES·US',lat:39.10,lon:-84.51,pred:-0.176,act:-0.027,held:false},
+  {tk:'TLT',name:'20Y·DC',lat:38.90,lon:-77.04,pred:-0.098,act:0.014,held:false},
+  {tk:'EEM',name:'EM·SHANGHAI',lat:31.23,lon:121.47,pred:-0.267,act:0.035,held:false},
+];
+const NAV=[
+  {m:'2025-08',ret:1.84,nav:1.0184},{m:'2025-09',ret:8.22,nav:1.1022},
+  {m:'2025-10',ret:2.89,nav:1.1341},{m:'2025-11',ret:-0.37,nav:1.1299},
+  {m:'2025-12',ret:0.75,nav:1.1384},{m:'2026-01',ret:4.48,nav:1.1894},
+];
+
+// ---------------------------------------------------------------- SCENE
+const app=document.getElementById('app');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,0.01,100);
+camera.position.set(1.4,0.8,2.6);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+app.appendChild(renderer.domElement);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.05;
+controls.minDistance=1.4; controls.maxDistance=6; controls.enablePan=false;
+controls.autoRotate=false;
+
+const globeGroup=new THREE.Group(); scene.add(globeGroup);
+
+// lights
+scene.add(new THREE.AmbientLight(0x2b3550,0.5));
+const sun=new THREE.DirectionalLight(0xfff2e0,3.0);
+sun.position.set(-2.2,1.0,1.6); scene.add(sun);
+const rim=new THREE.DirectionalLight(0x2a5cff,0.6); rim.position.set(2,-0.5,-1.5); scene.add(rim);
+
+function toVec(lat,lon,r=R){
+  const phi=(90-lat)*Math.PI/180, theta=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(theta));
+}
+
+// ---------------------------------------------------------------- TEXTURE LOAD
+const TG='https://cdn.jsdelivr.net/npm/three-globe/example/img/';
+const TJ='https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/';
+const loader=new THREE.TextureLoader(); loader.crossOrigin='anonymous';
+let loaded=0; const total=6;
+const bump=(t)=>{ loaded++; document.getElementById('lbar').style.width=(loaded/total*100)+'%';
+  if(loaded>=total) document.getElementById('loading').style.display='none'; };
+const tex=(url,srgb)=>loader.load(url,t=>{ if(srgb)t.colorSpace=THREE.SRGBColorSpace;
+  t.anisotropy=8; bump(); }, undefined, bump);
+
+const dayTex   = tex(TG+'earth-blue-marble.jpg', true);
+const nightTex = tex(TG+'earth-night.jpg', true);
+const specTex  = tex(TJ+'earth_specular_2048.jpg', false);
+const normTex  = tex(TJ+'earth_normal_2048.jpg', false);
+const cloudTex = tex(TJ+'earth_clouds_2048.png', true);
+const skyTex   = tex(TG+'night-sky.png', true);
+
+// starfield background
+skyTex.mapping=THREE.EquirectangularReflectionMapping;
+const skyGeo=new THREE.SphereGeometry(40,32,16);
+scene.add(new THREE.Mesh(skyGeo,new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide})));
+
+// earth
+const earthMat=new THREE.MeshStandardMaterial({
+  map:dayTex, normalMap:normTex, normalScale:new THREE.Vector2(0.6,0.6),
+  metalnessMap:specTex, metalness:0.45, roughness:0.72,
+  emissiveMap:nightTex, emissive:0xffcc88, emissiveIntensity:1.1,
+});
+const earth=new THREE.Mesh(new THREE.SphereGeometry(R,128,96), earthMat);
+globeGroup.add(earth);
+
+// clouds
+const clouds=new THREE.Mesh(new THREE.SphereGeometry(R*1.012,96,64),
+  new THREE.MeshStandardMaterial({alphaMap:cloudTex,transparent:true,opacity:0.85,
+    color:0xffffff,depthWrite:false,roughness:1,metalness:0}));
+globeGroup.add(clouds);
+
+// atmosphere (fresnel)
+const atmo=new THREE.Mesh(new THREE.SphereGeometry(R*1.16,96,64),
+  new THREE.ShaderMaterial({transparent:true,blending:THREE.AdditiveBlending,side:THREE.BackSide,depthWrite:false,
+    uniforms:{c:{value:new THREE.Color(0x3a86ff)}},
+    vertexShader:`varying vec3 vN; varying vec3 vP;
+      void main(){ vN=normalize(normalMatrix*normal);
+        vec4 mv=modelViewMatrix*vec4(position,1.0); vP=normalize(-mv.xyz);
+        gl_Position=projectionMatrix*mv; }`,
+    fragmentShader:`varying vec3 vN; varying vec3 vP; uniform vec3 c;
+      void main(){ float f=pow(1.0-abs(dot(vN,vP)),2.6); gl_FragColor=vec4(c,f*0.9); }`}));
+globeGroup.add(atmo);
+
+// ---------------------------------------------------------------- BARS + ARCS
+const barGroup=new THREE.Group(); globeGroup.add(barGroup);
+const arcGroup=new THREE.Group(); globeGroup.add(arcGroup);
+const nodeGroup=new THREE.Group(); globeGroup.add(nodeGroup);
+let bars=[], arcs=[], labelDefs=[];
+const UP=new THREE.Vector3(0,1,0);
+const SIGNAL_OP=THREE.MathUtils.clamp(Math.abs(IC)*1.4,0.03,0.20);
+
+function clearScene(){
+  bars.forEach(b=>{b.core.geometry.dispose();b.glow.geometry.dispose();barGroup.remove(b.grp);});
+  arcs.forEach(a=>{a.line.geometry.dispose();a.mat.dispose();arcGroup.remove(a.line);
+    a.flow&&a.flow.forEach(f=>{f.mesh.material.dispose();arcGroup.remove(f.mesh);});});
+  while(nodeGroup.children.length)nodeGroup.remove(nodeGroup.children[0]);
+  bars=[]; arcs=[]; labelDefs=[];
+}
+
+function addBar(lat,lon,height,colorHex){
+  const nrm=toVec(lat,lon).normalize();
+  const q=new THREE.Quaternion().setFromUnitVectors(UP,nrm);
+  const grp=new THREE.Group();
+  grp.position.copy(nrm.clone().multiplyScalar(R+height/2)); grp.quaternion.copy(q);
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.016,height,14,1,true),
+    new THREE.MeshBasicMaterial({color:colorHex}));
+  const glow=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.032,height,16,1,true),
+    new THREE.MeshBasicMaterial({color:colorHex,transparent:true,opacity:0.28,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.02,12,10),
+    new THREE.MeshBasicMaterial({color:colorHex}));
+  cap.position.y=height/2;
+  grp.add(glow,core,cap); barGroup.add(grp);
+  bars.push({grp,core,glow,base:0.28,t:Math.random()});
+  return nrm.clone().multiplyScalar(R+height);
+}
+
+function greatCircle(v0,v1,segs,bow){
+  const a=v0.clone().normalize(),b=v1.clone().normalize();
+  let om=Math.acos(THREE.MathUtils.clamp(a.dot(b),-1,1)); const pts=[];
+  for(let i=0;i<=segs;i++){ const t=i/segs; let p;
+    if(om<1e-4)p=a.clone();
+    else{const s0=Math.sin((1-t)*om)/Math.sin(om),s1=Math.sin(t*om)/Math.sin(om);
+      p=a.clone().multiplyScalar(s0).add(b.clone().multiplyScalar(s1));}
+    pts.push(p.normalize().multiplyScalar(1+0.01+Math.sin(Math.PI*t)*bow)); }
+  return pts;
+}
+const flowTex=(()=>{ // soft radial dot for flowing capital particles
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  const rg=g.createRadialGradient(32,32,0,32,32,32);
+  rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(0.4,'rgba(255,210,120,0.7)');
+  rg.addColorStop(1,'rgba(255,180,60,0)'); g.fillStyle=rg; g.fillRect(0,0,64,64);
+  const t=new THREE.CanvasTexture(c); return t; })();
+
+function addArc(from,to,weight,colorHex,dashy){
+  const v0=toVec(from.lat,from.lon),v1=toVec(to.lat,to.lon),d=v0.distanceTo(v1);
+  const pts=greatCircle(v0,v1,90,0.12+d*0.18);      // pts[0]=from(産地/南) → pts[end]=to(資本/北)
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  const mat=new THREE.LineBasicMaterial({color:colorHex,transparent:true,
+    opacity:SIGNAL_OP*(0.5+weight),blending:THREE.AdditiveBlending,depthWrite:false});
+  const line=new THREE.Line(g,mat); if(!arcsOn)line.visible=false; arcGroup.add(line);
+  // flowing capital particles: south(from) -> north(to)
+  const flowCol=dashy?0x38d6ff:0xffcf6a, ndots=3, flow=[];
+  for(let i=0;i<ndots;i++){
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:flowTex,color:flowCol,
+      transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));
+    sp.scale.setScalar(0.05+weight*0.03); if(!arcsOn)sp.visible=false;
+    arcGroup.add(sp); flow.push({mesh:sp,phase:i/ndots});
+  }
+  arcs.push({line,mat,base:mat.opacity,t:Math.random(),speed:0.12+Math.random()*0.18,
+    dashy,pts,flow,fspeed:0.18+weight*0.12});
+}
+function node(pos,color,size){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),
+    new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide}));
+  m.position.copy(pos.clone().multiplyScalar(1.004));
+  m.lookAt(pos.clone().multiplyScalar(2)); nodeGroup.add(m);
+}
+
+// ---------------------------------------------------------------- MODES
+let mode='source', arcsOn=true, randomOn=false, randomArcs=[];
+function buildSource(){
+  document.getElementById('legTitle').textContent='資本フロー 産地(南)→資本(北)';
+  node(toVec(WALLST.lat,WALLST.lon),0x38d6ff,0.05);
+  const top=addBar(WALLST.lat,WALLST.lon,0.30,0x38d6ff);
+  labelDefs.push({pos:top,text:'WALL ST',sub:'S&P/NASDAQ',cls:'dest'});
+  EXPORTERS.forEach(e=>{
+    const h=0.10+e.share*1.2, top=addBar(e.lat,e.lon,h,0xffb020);
+    labelDefs.push({pos:top,text:e.name,sub:(e.share*100|0)+'% EXPORT',cls:''});
+    addArc(e,WALLST,e.share,0x9aa4b2,false);
+  });
+  legendSource();
+}
+function buildEtf(){
+  document.getElementById('legTitle').textContent='AIの判断 バナナベルト→ETF配分';
+  ETFS.forEach(e=>{
+    const h=0.12+Math.abs(e.pred)*1.4;
+    const col=e.pred>=0?0x28ff7a:0xff4d4d;      // green up / red down (reference look)
+    const top=addBar(e.lat,e.lon,h,col);
+    labelDefs.push({pos:top,text:e.tk,sub:(e.pred>=0?'+':'')+(e.pred*100).toFixed(1)+'% PRED',cls:e.pred>=0?'':'dest'});
+    addArc(BANANA_CENTROID,e,Math.abs(e.pred)+(e.held?0.4:0),0x9aa4b2,false);
+  });
+  node(toVec(BANANA_CENTROID.lat,BANANA_CENTROID.lon),0xffb020,0.05);
+  legendEtf();
+}
+function buildRandom(){
+  const pts=[...EXPORTERS,...ETFS], pk=i=>pts[(i*7+3)%pts.length];
+  const before=arcs.length;
+  for(let i=0;i<6;i++)addArc(pk(i),pk(i*3+1),0.3,0x38d6ff,true);
+  randomArcs=arcs.slice(before);
+  randomArcs.forEach(a=>a.line.visible=true);
+}
+function clearRandom(){randomArcs.forEach(a=>{a.line.geometry.dispose();a.mat.dispose();
+  arcGroup.remove(a.line); a.flow&&a.flow.forEach(f=>{f.mesh.material.dispose();arcGroup.remove(f.mesh);});
+  const i=arcs.indexOf(a);if(i>=0)arcs.splice(i,1);});randomArcs=[];}
+
+function legendSource(){
+  document.getElementById('legTable').innerHTML=
+    `<tr><td style="color:var(--dim)">産地</td><td class="r" style="color:var(--dim)">輸出</td><td></td></tr>`+
+    EXPORTERS.map(e=>`<tr><td class="tk">${e.name}</td><td class="r">${(e.share*100).toFixed(0)}%</td>
+      <td class="r" style="color:var(--dim)">→ WALL ST</td></tr>`).join('');
+}
+function legendEtf(){
+  document.getElementById('legTable').innerHTML=
+    `<tr><td style="color:var(--dim)">ETF</td><td class="r" style="color:var(--dim)">PRED</td>
+      <td class="r" style="color:var(--dim)">ACT</td><td class="r" style="color:var(--dim)">DIR</td></tr>`+
+    ETFS.map(e=>{const hit=Math.sign(e.pred)===Math.sign(e.act);
+      return `<tr><td class="tk ${e.held?'held':'miss'}">${e.tk}${e.held?' ◆':''}</td>
+        <td class="r">${(e.pred>=0?'+':'')+e.pred.toFixed(3)}</td>
+        <td class="r" style="color:${e.act>=0?'var(--pos)':'var(--neg)'}">${(e.act>=0?'+':'')+e.act.toFixed(3)}</td>
+        <td class="r" style="color:${hit?'var(--pos)':'var(--neg)'}">${hit?'HIT':'MISS'}</td></tr>`;}).join('');
+}
+function setMode(m){ mode=m; clearScene();
+  if(m==='source')buildSource(); else buildEtf();
+  if(randomOn)buildRandom();
+  document.getElementById('mSource').classList.toggle('on',m==='source');
+  document.getElementById('mEtf').classList.toggle('on',m==='etf');
+  syncLabels();
+}
+
+// ---------------------------------------------------------------- TIMELINE
+(function timeline(){
+  const maxAbs=Math.max(...NAV.map(n=>Math.abs(n.ret)));
+  document.getElementById('tlBody').innerHTML=NAV.map((n,i)=>{
+    const w=Math.abs(n.ret)/maxAbs*50;
+    const bar=n.ret>=0?`<i class="p" style="width:${w}%"></i>`:`<i class="n" style="width:${w}%"></i>`;
+    return `<div class="tlrow ${i===NAV.length-1?'cur':''}"><span class="m">${n.m.slice(2)}</span>
+      <span class="tlbar">${bar}</span>
+      <span class="v" style="color:${n.ret>=0?'var(--pos)':'var(--neg)'}">${(n.ret>=0?'+':'')+n.ret.toFixed(2)}</span></div>`;
+  }).join('');
+})();
+
+// ---------------------------------------------------------------- LABELS
+const labelLayer=document.createElement('div'); document.body.appendChild(labelLayer);
+let labelEls=[];
+function syncLabels(){ labelEls.forEach(e=>e.remove()); labelEls=[];
+  labelDefs.forEach(d=>{ const el=document.createElement('div'); el.className='lbl3d '+d.cls;
+    el.innerHTML=`<span class="dot"></span>${d.text}<span class="sub"> ${d.sub||''}</span>`;
+    labelLayer.appendChild(el); labelEls.push(el); }); }
+
+// ---------------------------------------------------------------- UI
+const $=id=>document.getElementById(id);
+$('mSource').onclick=()=>setMode('source');
+$('mEtf').onclick=()=>setMode('etf');
+$('oRandom').onclick=()=>{randomOn=!randomOn;$('oRandom').classList.toggle('on',randomOn);
+  if(randomOn)buildRandom();else clearRandom();};
+$('oArcs').onclick=()=>{arcsOn=!arcsOn;$('oArcs').classList.toggle('on',arcsOn);
+  arcs.forEach(a=>{if(!(a.dashy&&!randomOn))a.line.visible=arcsOn;});};
+let rotate=true;
+$('oRotate').onclick=()=>{rotate=!rotate;$('oRotate').classList.toggle('on',rotate);};
+addEventListener('keydown',e=>{
+  const k=e.key.toUpperCase();
+  if(k==='F2')setMode('source'); if(k==='F3')setMode('etf');
+  if(k==='F4')$('oRandom').click(); if(k==='F5')$('oArcs').click(); if(k==='F6')$('oRotate').click();
+});
+
+// ---------------------------------------------------------------- POSTPROCESS
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.75,0.5,0.82);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---------------------------------------------------------------- CLOCK
+function clock(){const d=new Date(),p=n=>String(n).padStart(2,'0');
+  $('clock').textContent=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} JST`;}
+setInterval(clock,1000); clock();
+
+// ---------------------------------------------------------------- LOOP
+const tmp=new THREE.Vector3(), camPos=new THREE.Vector3();
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+  if(rotate)globeGroup.rotation.y+=dt*0.045;
+  clouds.rotation.y+=dt*0.008;
+  controls.update();
+  bars.forEach(b=>{const s=0.85+0.15*Math.sin(b.t+=dt*2.0); b.glow.material.opacity=b.base*s;});
+  arcs.forEach(a=>{a.t+=dt*a.speed; a.mat.opacity=a.base*(0.6+0.4*Math.sin(a.t*6.0));
+    if(a.flow)a.flow.forEach(f=>{
+      if(!a.line.visible){f.mesh.visible=false;return;}
+      f.phase=(f.phase+dt*a.fspeed)%1;
+      const idx=Math.min(a.pts.length-1,Math.floor(f.phase*(a.pts.length-1)));
+      f.mesh.position.copy(a.pts[idx]);
+      f.mesh.material.opacity=Math.sin(f.phase*Math.PI)*0.95; f.mesh.visible=true;
+    });});
+  composer.render();
+
+  // labels
+  globeGroup.updateMatrixWorld(); camera.getWorldPosition(camPos);
+  const rot=new THREE.Matrix4().extractRotation(globeGroup.matrixWorld);
+  labelDefs.forEach((d,i)=>{const el=labelEls[i]; if(!el)return;
+    tmp.copy(d.pos).applyMatrix4(globeGroup.matrixWorld); const world=tmp.clone(); tmp.project(camera);
+    const nrm=d.pos.clone().applyMatrix4(rot).normalize();
+    const toCam=camPos.clone().sub(world).normalize();
+    if(tmp.z>1||nrm.dot(toCam)<-0.15){el.classList.add('hidden');}
+    else{el.classList.remove('hidden');
+      el.style.left=(tmp.x*0.5+0.5)*innerWidth+'px'; el.style.top=(-tmp.y*0.5+0.5)*innerHeight+'px';}});
+  requestAnimationFrame(loop);
+}
+setMode('source');
+requestAnimationFrame(loop);
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
+  bloom.setSize(innerWidth,innerHeight);
+});
+</script>
