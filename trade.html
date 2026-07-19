@@ -1,0 +1,507 @@
+<meta charset="utf-8" />
+<title>BANANA TRADE FLOW — 南から北へ</title>
+<style>
+  :root{
+    --bg:#020408; --panel:#070b18cc; --border:#1a2338;
+    --amber:#FFB627; --amber2:#B07E1E; --bright:#FFD46A;
+    --cyan:#4FD8FF; --cyan2:#2A7FA0; --dim:#5a627e; --txt:#9aa3c0;
+    --mono:'JetBrains Mono','IBM Plex Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--txt);font-family:var(--mono);
+    font-size:12px;overflow:hidden}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:var(--bg);z-index:60;color:var(--dim);
+    letter-spacing:3px;font-size:11px}
+  #loading .bar{margin-top:14px;width:220px;height:2px;background:#141a2c}
+  #loading .barfill{height:100%;width:0;background:var(--amber);transition:width .2s}
+
+  #statusbar{position:fixed;top:0;left:0;right:0;height:26px;background:var(--panel);
+    border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;
+    padding:0 12px;z-index:20;font-size:11px;color:var(--dim);backdrop-filter:blur(6px)}
+  #statusbar b{color:var(--bright);letter-spacing:1px}
+  #statusbar .sep{color:#252c44}
+  #statusbar a{color:var(--dim);text-decoration:none}
+  #statusbar a:hover{color:var(--amber)}
+
+  #legend{position:fixed;left:12px;bottom:12px;background:var(--panel);
+    border:1px solid var(--border);padding:10px 12px;z-index:15;backdrop-filter:blur(6px);
+    font-size:10px;line-height:1.9;max-width:270px}
+  #legend .t{color:var(--bright);font-size:11px;letter-spacing:1px;margin-bottom:4px}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:-1px}
+  .sw.exp{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+  .sw.imp{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+  .sw.arc{background:linear-gradient(90deg,var(--amber),var(--cyan));border-radius:2px;width:16px;height:3px}
+  #legend .src{margin-top:6px;color:var(--dim);font-size:9px;line-height:1.5}
+
+  #hud{position:fixed;right:12px;top:38px;background:var(--panel);border:1px solid var(--border);
+    padding:9px 12px;z-index:15;backdrop-filter:blur(6px);font-size:10px;width:210px}
+  #hud .t{color:var(--bright);font-size:11px;letter-spacing:1px;margin-bottom:5px}
+  .mrow{display:flex;justify-content:space-between;padding:1px 0}
+  .mrow .v{color:var(--amber);font-variant-numeric:tabular-nums}
+  #hud .keys{margin-top:7px;padding-top:6px;border-top:1px dotted var(--border);color:var(--dim)}
+  #hud .keys b{color:var(--txt);font-weight:400}
+  #hud .sun{margin-top:7px;padding-top:6px;border-top:1px dotted var(--border)}
+  #hud .sun label{display:flex;justify-content:space-between;color:var(--dim);margin-bottom:2px}
+  #hud .sun label span{color:var(--amber)}
+  #hud input[type=range]{width:100%;accent-color:var(--amber);height:2px}
+
+  #tip{position:fixed;pointer-events:none;background:#0a0f20f0;border:1px solid var(--border);
+    padding:7px 10px;font-size:10px;z-index:40;display:none;line-height:1.7;max-width:240px}
+  #tip .n{color:var(--bright);font-size:11px;letter-spacing:1px}
+  #tip .r{color:var(--txt)} #tip .r b{color:var(--amber);font-weight:400}
+</style>
+
+<div id="app"></div>
+<div id="loading">BANANA TRADE FLOW<div class="bar"><div class="barfill" id="barfill"></div></div></div>
+
+<div id="statusbar">
+  <b>BANANA TRADE FLOW</b><span class="sep">|</span>
+  <span>南から北へ — グローバルサウスの果実、北の食卓と資本へ</span>
+  <span class="sep">|</span><span id="clock"></span>
+  <span style="flex:1"></span>
+  <a href="index.html">← GLOBE</a><span class="sep">|</span><a href="evidence.html">EVIDENCE →</a>
+</div>
+
+<div id="legend">
+  <div class="t">LEGEND</div>
+  <div><span class="sw exp"></span>輸出国（産地）— 大きさ=輸出量</div>
+  <div><span class="sw imp"></span>輸入国（消費地）— 大きさ=輸入量</div>
+  <div><span class="sw arc"></span>貿易フロー — 太さ・粒子密度=年間輸送量</div>
+  <div class="src">出典: FAO/UN Comtrade 2023年前後の年間貿易量（概数, 百万トン）。
+  世界のバナナ輸出の約8割が中南米・東南アジアから北の消費市場へ流れる。</div>
+</div>
+
+<div id="hud">
+  <div class="t">FLOW STATS</div>
+  <div class="mrow"><span>flows</span><span class="v" id="stFlows">—</span></div>
+  <div class="mrow"><span>total volume</span><span class="v" id="stVol">—</span></div>
+  <div class="mrow"><span>largest</span><span class="v" id="stMax">—</span></div>
+  <div class="mrow"><span>south→north</span><span class="v" id="stSN">—</span></div>
+  <div class="sun">
+    <label>sun longitude <span id="sunLonV">-100°</span></label>
+    <input type="range" id="sunLon" min="-180" max="180" step="1" value="-100">
+  </div>
+  <div class="keys">
+    <b>drag</b> rotate · <b>wheel</b> zoom<br>
+    <b>R</b> auto-rotate · <b>L</b> labels
+  </div>
+</div>
+
+<div id="tip"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= DATA =================
+   バナナ貿易フロー（FAO/UN Comtrade 2023年前後の概数, 単位: 百万トン/年）
+   exporter → importer。EUは玄関港(ロッテルダム/アントワープ)周辺に集約。 */
+const NODES = {
+  ECU:{name:'ECUADOR',        ja:'エクアドル',      lat:-1.83, lon:-78.18, role:'exp'},
+  PHL:{name:'PHILIPPINES',    ja:'フィリピン',      lat: 12.88,lon:121.77, role:'exp'},
+  CRI:{name:'COSTA RICA',     ja:'コスタリカ',      lat:  9.75,lon:-83.75, role:'exp'},
+  GTM:{name:'GUATEMALA',      ja:'グアテマラ',      lat: 15.78,lon:-90.23, role:'exp'},
+  COL:{name:'COLOMBIA',       ja:'コロンビア',      lat:  4.57,lon:-74.30, role:'exp'},
+  HND:{name:'HONDURAS',       ja:'ホンジュラス',    lat: 15.20,lon:-86.24, role:'exp'},
+  MEX:{name:'MEXICO',         ja:'メキシコ',        lat: 19.43,lon:-99.13, role:'exp'},
+  DOM:{name:'DOMINICAN REP.', ja:'ドミニカ共和国',  lat: 18.74,lon:-70.16, role:'exp'},
+  PER:{name:'PERU',           ja:'ペルー',          lat: -9.19,lon:-75.02, role:'exp'},
+  CIV:{name:"CÔTE D'IVOIRE",  ja:'コートジボワール',lat:  7.54,lon: -5.55, role:'exp'},
+  CMR:{name:'CAMEROON',       ja:'カメルーン',      lat:  4.15,lon:  9.29, role:'exp'},
+  VNM:{name:'VIETNAM',        ja:'ベトナム',        lat: 14.06,lon:108.28, role:'exp'},
+  KHM:{name:'CAMBODIA',       ja:'カンボジア',      lat: 12.57,lon:104.99, role:'exp'},
+
+  USA:{name:'UNITED STATES',  ja:'アメリカ',        lat: 40.71,lon:-74.01, role:'imp'},
+  EUR:{name:'EU (ROTTERDAM)', ja:'EU圏',            lat: 51.92,lon:  4.48, role:'imp'},
+  RUS:{name:'RUSSIA',         ja:'ロシア',          lat: 59.93,lon: 30.34, role:'imp'},
+  CHN:{name:'CHINA',          ja:'中国',            lat: 31.23,lon:121.47, role:'imp'},
+  JPN:{name:'JAPAN',          ja:'日本',            lat: 35.68,lon:139.69, role:'imp'},
+  KOR:{name:'SOUTH KOREA',    ja:'韓国',            lat: 37.57,lon:126.98, role:'imp'},
+  MEA:{name:'MIDDLE EAST',    ja:'中東(GCC)',       lat: 25.20,lon: 55.27, role:'imp'},
+  TUR:{name:'TÜRKIYE',        ja:'トルコ',          lat: 41.01,lon: 28.98, role:'imp'},
+  ARG:{name:'ARGENTINA',      ja:'アルゼンチン',    lat:-34.60,lon:-58.38, role:'imp'},
+  GBR:{name:'UNITED KINGDOM', ja:'イギリス',        lat: 51.51,lon: -0.13, role:'imp'},
+};
+const FLOWS = [
+  ['ECU','EUR',1.90],['ECU','RUS',1.30],['ECU','USA',0.65],['ECU','CHN',0.55],
+  ['ECU','MEA',0.50],['ECU','TUR',0.45],['ECU','ARG',0.35],
+  ['PHL','JPN',0.90],['PHL','CHN',0.70],['PHL','KOR',0.30],['PHL','MEA',0.25],
+  ['CRI','USA',1.00],['CRI','EUR',0.90],
+  ['GTM','USA',1.55],
+  ['COL','EUR',1.30],['COL','USA',0.50],['COL','GBR',0.25],
+  ['HND','USA',0.50],
+  ['MEX','USA',0.50],
+  ['DOM','EUR',0.20],['DOM','GBR',0.15],
+  ['PER','EUR',0.20],
+  ['CIV','EUR',0.35],
+  ['CMR','EUR',0.20],
+  ['VNM','CHN',0.50],
+  ['KHM','CHN',0.35],
+];
+
+/* ================= SCENE ================= */
+const R=1.0;
+const COL_AMBER=new THREE.Color('#FFB627');
+const COL_CYAN=new THREE.Color('#4FD8FF');
+
+const app=document.getElementById('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.0;
+app.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#020408');
+const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,0.01,100);
+camera.position.set(1.99,1.31,1.99); // 大西洋=バナナ航路が正面
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.06;
+controls.minDistance=1.6; controls.maxDistance=6; controls.enablePan=false;
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.35,0.4,1.0);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+const world=new THREE.Group(); scene.add(world);
+
+function toVec(lat,lon,r=R){
+  const ph=(90-lat)*Math.PI/180, th=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(-r*Math.sin(ph)*Math.cos(th), r*Math.cos(ph), r*Math.sin(ph)*Math.sin(th));
+}
+
+/* --- sun (world space; 地球はworldごと自転するので太陽は固定) --- */
+const uSunDir={value:toVec(15,-100,1).normalize()};
+const sunSlider=document.getElementById('sunLon');
+const sunLonV=document.getElementById('sunLonV');
+sunSlider.addEventListener('input',()=>{
+  const lon=+sunSlider.value;
+  uSunDir.value.copy(toVec(15,lon,1).normalize());
+  sunLonV.textContent=lon+'°';
+});
+
+/* ================= TEXTURES ================= */
+const barfill=document.getElementById('barfill');
+const texLoader=new THREE.TextureLoader();
+let loaded=0;
+function loadTex(url,srgb=true){
+  return new Promise((res,rej)=>texLoader.load(url,t=>{
+    if(srgb)t.colorSpace=THREE.SRGBColorSpace;
+    t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+    loaded++; barfill.style.width=Math.round(loaded/4*100)+'%';
+    res(t);
+  },undefined,rej));
+}
+
+/* ================= EARTH ================= */
+const uTime={value:0};
+async function buildEarth(){
+  // 昼テクスチャ: NASA Blue Marble NG (2004-07) 21600px原板→16K縮小。GPU上限<16Kなら8Kへ
+  const dayUrl=renderer.capabilities.maxTextureSize>=16384?'tex/color_16k.jpg':'tex/color_8k.jpg';
+  const [tDay,tNight,tSpec,tStars]=await Promise.all([
+    loadTex(dayUrl), loadTex('tex/night_8k.jpg'),
+    loadTex('tex/spec.jpg',false),
+    loadTex('tex/stars_8k.jpg'),
+  ]);
+
+  /* --- surface: 昼夜ミックス+海面スペキュラ --- */
+  const earth=new THREE.Mesh(
+    new THREE.SphereGeometry(R,128,128),
+    new THREE.ShaderMaterial({
+      uniforms:{tDay:{value:tDay},tNight:{value:tNight},tSpec:{value:tSpec},
+        uSunDir,uTime},
+      vertexShader:`
+        varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+        void main(){
+          vUv=uv;
+          vN=normalize(mat3(modelMatrix)*normal);
+          vW=(modelMatrix*vec4(position,1.0)).xyz;
+          gl_Position=projectionMatrix*viewMatrix*vec4(vW,1.0);
+        }`,
+      fragmentShader:`
+        uniform sampler2D tDay,tNight,tSpec;
+        uniform vec3 uSunDir;
+        varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+        void main(){
+          vec3 N=normalize(vN);
+          float ndl=dot(N,uSunDir);
+          float dayF=smoothstep(-0.10,0.25,ndl);
+          // day: soft-wrapped lambert
+          float diff=clamp((ndl+0.06)/1.06,0.0,1.0);
+          vec3 day=texture2D(tDay,vUv).rgb*(0.10+1.45*diff);
+          // terminator warmth
+          float band=smoothstep(0.35,0.0,abs(ndl))*dayF;
+          day*=mix(vec3(1.0),vec3(1.25,0.82,0.58),band*0.8);
+          // ocean specular (sun glint)
+          vec3 V=normalize(cameraPosition-vW);
+          vec3 H=normalize(uSunDir+V);
+          float specMask=texture2D(tSpec,vUv).r;
+          float spec=pow(max(dot(N,H),0.0),160.0)*specMask*dayF;
+          day+=vec3(1.0,0.9,0.7)*spec*0.7;
+          // night: city lights, amber tint
+          vec3 nightT=texture2D(tNight,vUv).rgb;
+          vec3 night=pow(nightT,vec3(1.4))*vec3(1.0,0.72,0.4)*2.4;
+          vec3 col=mix(night,day,dayF);
+          gl_FragColor=vec4(col,1.0);
+        }`
+    })
+  );
+  world.add(earth);
+
+  /* --- starfield --- */
+  const stars=new THREE.Mesh(
+    new THREE.SphereGeometry(50,32,32),
+    new THREE.MeshBasicMaterial({map:tStars,side:THREE.BackSide,
+      color:0x9099aa,depthWrite:false}));
+  scene.add(stars);
+}
+
+/* ================= ARCS ================= */
+function arcPoints(a,b,n=128){
+  const va=toVec(a.lat,a.lon),vb=toVec(b.lat,b.lon);
+  const ang=va.angleTo(vb);
+  const alt=0.10+0.35*(ang/Math.PI); // 距離に応じて高く
+  const pts=[];
+  for(let i=0;i<=n;i++){
+    const t=i/n;
+    const v=new THREE.Vector3().copy(va).multiplyScalar(Math.sin((1-t)*ang)/Math.sin(ang))
+      .add(vb.clone().multiplyScalar(Math.sin(t*ang)/Math.sin(ang)));
+    v.normalize().multiplyScalar(R*(1+alt*Math.sin(Math.PI*t)));
+    pts.push(v);
+  }
+  return pts;
+}
+
+const arcMat=new THREE.ShaderMaterial({
+  uniforms:{uTime},
+  transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
+  vertexShader:`
+    attribute float aT; attribute float aW; attribute vec3 aColor;
+    varying float vT; varying float vW; varying vec3 vC;
+    void main(){ vT=aT; vW=aW; vC=aColor;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`
+    uniform float uTime; varying float vT; varying float vW; varying vec3 vC;
+    void main(){
+      float base=0.16+0.28*vW;
+      float ph=fract(vT-uTime*0.13);
+      float pulse=pow(1.0-ph,6.0)*(0.7+1.9*vW);
+      float a=base+pulse;
+      gl_FragColor=vec4(vC*(1.3+2.8*pulse),a);
+    }`
+});
+
+const flowMeta=[];
+let totalVol=0,maxFlow=null;
+(function buildArcs(){
+  const volMax=Math.max(...FLOWS.map(f=>f[2]));
+  const positions=[],ts=[],ws=[],cols=[],indices=[];
+  let vi=0;
+  const cExp=COL_AMBER,cImp=COL_CYAN;
+  for(const [ea,ib,vol] of FLOWS){
+    const A=NODES[ea],B=NODES[ib];
+    const pts=arcPoints(A,B,128);
+    const w=vol/volMax;
+    for(let i=0;i<pts.length;i++){
+      const t=i/(pts.length-1);
+      positions.push(pts[i].x,pts[i].y,pts[i].z);
+      ts.push(t); ws.push(w);
+      const c=cExp.clone().lerp(cImp,t*0.85);
+      cols.push(c.r,c.g,c.b);
+      if(i<pts.length-1){indices.push(vi+i,vi+i+1);}
+    }
+    vi+=pts.length;
+    flowMeta.push({A,B,vol,pts,w});
+    totalVol+=vol;
+    if(!maxFlow||vol>maxFlow.vol)maxFlow={A,B,vol};
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  g.setAttribute('aT',new THREE.Float32BufferAttribute(ts,1));
+  g.setAttribute('aW',new THREE.Float32BufferAttribute(ws,1));
+  g.setAttribute('aColor',new THREE.Float32BufferAttribute(cols,3));
+  g.setIndex(indices);
+  world.add(new THREE.LineSegments(g,arcMat));
+})();
+
+/* --- 粒子: フローに沿って産地→消費地へ、密度∝量 --- */
+(function buildParticles(){
+  const pos=[],prm=[],cols=[];
+  for(const f of flowMeta){
+    const count=Math.max(4,Math.round(f.vol*26));
+    for(let i=0;i<count;i++){
+      pos.push(0,0,0);
+      prm.push(Math.random(),0.5+Math.random()*0.7,f.w); // offset, speed, weight
+      cols.push(flowMeta.indexOf(f));
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  const mat=new THREE.PointsMaterial({size:0.017,color:0xFFD46A,transparent:true,
+    opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true});
+  mat.color.multiplyScalar(2.2);
+  const points=new THREE.Points(g,mat);
+  world.add(points);
+  const posAttr=g.getAttribute('position');
+  const N=prm.length/3;
+  points.onBeforeRender=()=>{
+    const t=uTime.value;
+    for(let i=0;i<N;i++){
+      const off=prm[i*3],spd=prm[i*3+1],fi=cols[i];
+      const f=flowMeta[fi];
+      const u=(off+t*0.055*spd)%1;
+      const idx=u*(f.pts.length-1),i0=Math.floor(idx),fr=idx-i0;
+      const p0=f.pts[i0],p1=f.pts[Math.min(i0+1,f.pts.length-1)];
+      posAttr.setXYZ(i,
+        p0.x+(p1.x-p0.x)*fr, p0.y+(p1.y-p0.y)*fr, p0.z+(p1.z-p0.z)*fr);
+    }
+    posAttr.needsUpdate=true;
+  };
+})();
+
+/* ================= NODES & LABELS ================= */
+const nodeVol={};
+for(const [ea,ib,vol] of FLOWS){
+  nodeVol[ea]=(nodeVol[ea]||0)+vol;
+  nodeVol[ib]=(nodeVol[ib]||0)+vol;
+}
+const pickables=[];
+function makeLabel(text,color){
+  const pad=6,fs=22;
+  const cv=document.createElement('canvas');
+  const cx=cv.getContext('2d');
+  cx.font=`${fs}px 'JetBrains Mono',monospace`;
+  cv.width=Math.ceil(cx.measureText(text).width)+pad*2; cv.height=fs+pad*2;
+  const c2=cv.getContext('2d');
+  c2.font=`${fs}px 'JetBrains Mono',monospace`;
+  c2.textBaseline='middle';
+  c2.lineWidth=4; c2.strokeStyle='rgba(0,0,0,0.85)';
+  c2.strokeText(text,pad,cv.height/2);
+  c2.fillStyle=color;
+  c2.fillText(text,pad,cv.height/2);
+  const tex=new THREE.CanvasTexture(cv);
+  tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,
+    opacity:0.9,depthWrite:false}));
+  const s=0.0011;
+  sp.scale.set(cv.width*s,cv.height*s,1);
+  return sp;
+}
+const labelGroup=new THREE.Group(); world.add(labelGroup);
+for(const [id,n] of Object.entries(NODES)){
+  const vol=nodeVol[id]||0.1;
+  const isExp=n.role==='exp';
+  const col=isExp?COL_AMBER:COL_CYAN;
+  const p=toVec(n.lat,n.lon,R*1.004);
+  const size=0.010+0.028*Math.sqrt(vol/7);
+  const dot=new THREE.Mesh(
+    new THREE.SphereGeometry(size,16,16),
+    new THREE.MeshBasicMaterial({color:col.clone().multiplyScalar(2.2)}));
+  dot.position.copy(p); world.add(dot);
+  // ring
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(size*1.8,size*2.05,40),
+    new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide,
+      transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));
+  ring.position.copy(p);
+  ring.lookAt(p.clone().multiplyScalar(2));
+  world.add(ring);
+  // pick target (少し大きい不可視球)
+  const pick=new THREE.Mesh(new THREE.SphereGeometry(Math.max(size*2.6,0.035),8,8),
+    new THREE.MeshBasicMaterial({visible:false}));
+  pick.position.copy(p); pick.userData={id,...n,vol};
+  world.add(pick); pickables.push(pick);
+  // label（主要ノードのみ）
+  if(vol>0.55){
+    const lb=makeLabel(n.name,isExp?'#FFB627':'#4FD8FF');
+    lb.position.copy(toVec(n.lat,n.lon,R*1.07));
+    labelGroup.add(lb);
+  }
+}
+
+/* ================= UI / STATS ================= */
+document.getElementById('stFlows').textContent=FLOWS.length;
+document.getElementById('stVol').textContent=totalVol.toFixed(1)+' Mt/yr';
+document.getElementById('stMax').textContent=
+  `${maxFlow.A.name.slice(0,3)}→${maxFlow.B.name.slice(0,3)} ${maxFlow.vol.toFixed(1)}Mt`;
+const snVol=FLOWS.filter(([a,b])=>NODES[a].lat<NODES[b].lat).reduce((s,f)=>s+f[2],0);
+document.getElementById('stSN').textContent=Math.round(snVol/totalVol*100)+'%';
+
+setInterval(()=>{document.getElementById('clock').textContent=
+  new Date().toISOString().slice(0,19).replace('T',' ')+'Z';},1000);
+
+/* --- hover tooltip --- */
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
+const tip=document.getElementById('tip');
+addEventListener('pointermove',e=>{
+  mouse.x=e.clientX/innerWidth*2-1; mouse.y=-(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObjects(pickables)[0];
+  if(hit){
+    const d=hit.object.userData;
+    const rel=FLOWS.filter(([a,b])=>a===d.id||b===d.id)
+      .map(([a,b,v])=>{
+        const other=a===d.id?NODES[b]:NODES[a];
+        const dir=a===d.id?'→':'←';
+        return `<div class="r">${dir} ${other.name} <b>${v.toFixed(2)}Mt</b></div>`;
+      }).join('');
+    tip.innerHTML=`<div class="n">${d.name} / ${d.ja}</div>
+      <div class="r">${d.role==='exp'?'輸出':'輸入'}合計 <b>${d.vol.toFixed(2)} Mt/yr</b></div>${rel}`;
+    tip.style.display='block';
+    tip.style.left=(e.clientX+14)+'px';
+    tip.style.top=(e.clientY+10)+'px';
+    document.body.style.cursor='crosshair';
+  }else{
+    tip.style.display='none';
+    document.body.style.cursor='default';
+  }
+});
+
+/* --- keys --- */
+let autoRotate=true,showLabels=true;
+addEventListener('keydown',e=>{
+  if(e.key==='r'||e.key==='R'){autoRotate=!autoRotate;}
+  if(e.key==='l'||e.key==='L'){showLabels=!showLabels;labelGroup.visible=showLabels;}
+});
+
+/* ================= LOOP ================= */
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
+});
+
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  uTime.value=clock.getElapsedTime();
+  if(autoRotate)world.rotation.y+=0.0005;
+  controls.update();
+  composer.render();
+}
+
+buildEarth().then(()=>{
+  barfill.style.width='100%';
+  setTimeout(()=>document.getElementById('loading').remove(),250);
+  loop();
+}).catch(err=>{
+  document.getElementById('loading').textContent='TEXTURE LOAD FAILED: '+err;
+  console.error(err);
+});
+</script>
