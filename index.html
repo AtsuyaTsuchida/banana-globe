@@ -92,7 +92,7 @@
 <div id="app"></div>
 
 <div id="statusbar">
-  <span>BANANA-USD <b>1.1574</b> <span class="sep">|</span></span>
+  <span>BANANA-USD <b>1.1800</b> <span class="sep">|</span></span>
   <span>IC <b>+0.0390</b> <span class="sep">/</span> P <span style="color:var(--neg)">0.227</span> <span class="sep">|</span></span>
   <span>SIGNAL: <b style="color:var(--neg)">NOISE</b> <span class="sep">|</span></span>
   <span id="clock"></span><span class="sep">|</span><span class="live">● TRADING</span>
@@ -109,7 +109,8 @@
     <div class="stamp" style="border-color:var(--warn);color:var(--warn)">PROFIT IS NOT THE OBJECTIVE</div>
     <div style="color:var(--dim);font-size:10px;margin:8px 0 3px">参考指標（利益の根拠として提示しない）</div>
     <div class="metric"><span class="lbl">予測 IC / p値</span><span class="val">+0.039 <span class="neg">p=0.227</span></span></div>
-    <div class="metric"><span class="lbl">ペーパー NAV / 損益</span><span class="val pos">1.189x +¥18,940</span></div>
+    <div class="metric"><span class="lbl">ペーパー NAV / 損益</span><span class="val pos" id="navMetric">1.305x +¥30,467</span></div>
+    <div class="note" style="font-size:9px;margin-top:3px">2026-02以降は実モデル(finetune_best.ckpt)による遡及補完 [inferred]・7月はMTD</div>
     <div class="note" style="font-size:10px">このAIは<b>統計的に有意なシグナルを持たない</b>。
       それでも取引する——利益ではなく<b>思考</b>のために。有意でなさは欠陥ではなく、
       「儲けを目的化しないAI」の<b>証</b>。 <span style="color:var(--neu)">→ 客観検証: /evidence.html</span></div>
@@ -133,7 +134,7 @@
 </div>
 
 <div class="panel" id="timeline">
-  <div class="ph"><span><span class="barmark">█</span> CHRONOLOGICAL SUMMARY</span><span class="k" id="tlDate">2026-01</span></div>
+  <div class="ph"><span><span class="barmark">█</span> CHRONOLOGICAL SUMMARY</span><span class="k" id="tlDate">2026-07</span></div>
   <div class="pb"><div style="color:var(--dim);font-size:10px;margin-bottom:4px">PAPER NAV / 月次リターン</div>
     <div id="tlBody"></div></div>
 </div>
@@ -178,20 +179,25 @@ const EXPORTERS=[
 ];
 const WALLST={name:'WALL ST',lat:40.71,lon:-74.01};
 const BANANA_CENTROID={name:'BANANA BELT',lat:8.0,lon:-80.0};
+// 2026-07 signals (real model finetune_best.ckpt, input = banana through 2026-06; act = July MTD 〜07-17)
 const ETFS=[
-  {tk:'GLD',name:'GOLD·LONDON',lat:51.51,lon:-0.13,pred:0.165,act:0.035,held:true},
-  {tk:'QQQ',name:'NASDAQ·NY',lat:40.75,lon:-73.98,pred:0.126,act:0.047,held:true},
-  {tk:'XLK',name:'TECH·SANJOSE',lat:37.34,lon:-121.89,pred:0.043,act:0.065,held:true},
-  {tk:'DBA',name:'AGRI·CHICAGO',lat:41.88,lon:-87.63,pred:0.034,act:-0.015,held:false},
-  {tk:'SPY',name:'S&P·NY',lat:40.71,lon:-74.01,pred:-0.188,act:0.024,held:false},
-  {tk:'XLP',name:'STAPLES·US',lat:39.10,lon:-84.51,pred:-0.176,act:-0.027,held:false},
-  {tk:'TLT',name:'20Y·DC',lat:38.90,lon:-77.04,pred:-0.098,act:0.014,held:false},
-  {tk:'EEM',name:'EM·SHANGHAI',lat:31.23,lon:121.47,pred:-0.267,act:0.035,held:false},
+  {tk:'GLD',name:'GOLD·LONDON',lat:51.51,lon:-0.13,pred:0.139,act:0.000,held:true},
+  {tk:'QQQ',name:'NASDAQ·NY',lat:40.75,lon:-73.98,pred:-0.094,act:-0.056,held:false},
+  {tk:'XLK',name:'TECH·SANJOSE',lat:37.34,lon:-121.89,pred:0.109,act:-0.078,held:true},
+  {tk:'DBA',name:'AGRI·CHICAGO',lat:41.88,lon:-87.63,pred:-0.020,act:0.044,held:false},
+  {tk:'SPY',name:'S&P·NY',lat:40.71,lon:-74.01,pred:0.014,act:-0.005,held:true},
+  {tk:'XLP',name:'STAPLES·US',lat:39.10,lon:-84.51,pred:-0.002,act:0.026,held:false},
+  {tk:'TLT',name:'20Y·DC',lat:38.90,lon:-77.04,pred:-0.153,act:-0.018,held:false},
+  {tk:'EEM',name:'EM·SHANGHAI',lat:31.23,lon:121.47,pred:-0.271,act:-0.075,held:false},
 ];
-const NAV=[
+// fallback data — live values are fetched from data/nav.json (exported by terminal)
+let NAV=[
   {m:'2025-08',ret:1.84,nav:1.0184},{m:'2025-09',ret:8.22,nav:1.1022},
   {m:'2025-10',ret:2.89,nav:1.1341},{m:'2025-11',ret:-0.37,nav:1.1299},
   {m:'2025-12',ret:0.75,nav:1.1384},{m:'2026-01',ret:4.48,nav:1.1894},
+  {m:'2026-02',ret:0.94,nav:1.2006,rec:true},{m:'2026-03',ret:-5.82,nav:1.1307,rec:true},
+  {m:'2026-04',ret:12.85,nav:1.2760,rec:true},{m:'2026-05',ret:9.56,nav:1.3980,rec:true},
+  {m:'2026-06',ret:-3.99,nav:1.3422,rec:true},{m:'2026-07',ret:-2.80,nav:1.3047,rec:true},
 ];
 
 // ---------------------------------------------------------------- SCENE
@@ -412,16 +418,27 @@ function setMode(m){ mode=m; clearScene();
 }
 
 // ---------------------------------------------------------------- TIMELINE
-(function timeline(){
+function renderTimeline(){
   const maxAbs=Math.max(...NAV.map(n=>Math.abs(n.ret)));
   document.getElementById('tlBody').innerHTML=NAV.map((n,i)=>{
     const w=Math.abs(n.ret)/maxAbs*50;
     const bar=n.ret>=0?`<i class="p" style="width:${w}%"></i>`:`<i class="n" style="width:${w}%"></i>`;
-    return `<div class="tlrow ${i===NAV.length-1?'cur':''}"><span class="m">${n.m.slice(2)}</span>
+    return `<div class="tlrow ${i===NAV.length-1?'cur':''}"><span class="m">${n.m.slice(2)}${n.rec?'*':''}</span>
       <span class="tlbar">${bar}</span>
       <span class="v" style="color:${n.ret>=0?'var(--pos)':'var(--neg)'}">${(n.ret>=0?'+':'')+n.ret.toFixed(2)}</span></div>`;
-  }).join('');
-})();
+  }).join('')+
+  `<div style="color:var(--dim);font-size:9px;margin-top:5px">* inferred — 実モデルによる遡及補完／直近月はMTD</div>`;
+}
+renderTimeline();
+// live data from the terminal export (fetch fails on file:// → embedded fallback stays)
+fetch('data/nav.json').then(r=>r.json()).then(d=>{
+  if(!d||!d.months)return;
+  NAV=d.months.map(x=>({m:'20'+x.m,ret:x.ret,nav:x.nav,rec:x.src==='inferred'}));
+  renderTimeline();
+  document.getElementById('tlDate').textContent='20'+d.months[d.months.length-1].m;
+  const el=document.getElementById('navMetric');
+  if(el)el.textContent=d.nav.toFixed(3)+'x '+(d.pnl>=0?'+':'−')+'¥'+Math.abs(d.pnl).toLocaleString();
+}).catch(()=>{});
 
 // ---------------------------------------------------------------- LABELS
 const labelLayer=document.createElement('div'); document.body.appendChild(labelLayer);

@@ -1,0 +1,150 @@
+{
+ "updated": "2026-07-20 10:17:37",
+ "period": [
+  "2025-08",
+  "2026-07"
+ ],
+ "nav": 1.3047,
+ "pnl": 30467,
+ "principal": 100000,
+ "currency": "JPY",
+ "months": [
+  {
+   "m": "25-08",
+   "ret": 1.84,
+   "nav": 1.0184,
+   "top3": [
+    "GLD",
+    "QQQ",
+    "XLK"
+   ],
+   "src": "walk-forward"
+  },
+  {
+   "m": "25-09",
+   "ret": 8.22,
+   "nav": 1.1022,
+   "top3": [
+    "GLD",
+    "QQQ",
+    "XLK"
+   ],
+   "src": "walk-forward"
+  },
+  {
+   "m": "25-10",
+   "ret": 2.89,
+   "nav": 1.1341,
+   "top3": [
+    "XLK",
+    "DBA",
+    "GLD"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "25-11",
+   "ret": -0.37,
+   "nav": 1.1299,
+   "top3": [
+    "XLK",
+    "QQQ",
+    "GLD"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "25-12",
+   "ret": 0.75,
+   "nav": 1.1384,
+   "top3": [
+    "XLK",
+    "GLD",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-01",
+   "ret": 4.48,
+   "nav": 1.1894,
+   "top3": [
+    "XLK",
+    "GLD",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-02",
+   "ret": 0.94,
+   "nav": 1.2006,
+   "top3": [
+    "XLK",
+    "GLD",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-03",
+   "ret": -5.82,
+   "nav": 1.1307,
+   "top3": [
+    "XLK",
+    "XLP",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-04",
+   "ret": 12.85,
+   "nav": 1.276,
+   "top3": [
+    "XLK",
+    "XLP",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-05",
+   "ret": 9.56,
+   "nav": 1.398,
+   "top3": [
+    "XLK",
+    "GLD",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-06",
+   "ret": -3.99,
+   "nav": 1.3422,
+   "top3": [
+    "XLK",
+    "GLD",
+    "QQQ"
+   ],
+   "src": "inferred"
+  },
+  {
+   "m": "26-07",
+   "ret": -2.8,
+   "nav": 1.3047,
+   "top3": [
+    "GLD",
+    "XLK",
+    "SPY"
+   ],
+   "src": "inferred"
+  }
+ ],
+ "bananas": {
+  "count": 761,
+  "kg": 114.1,
+  "price_jpy": 40
+ }
+}

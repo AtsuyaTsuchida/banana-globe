@@ -1,0 +1,632 @@
+<meta charset="utf-8" />
+<title>TBOW — RESULT INDEX R-2026-07</title>
+<style>
+  :root{
+    --amber:#FFB627; --amber2:#B07E1E; --bright:#FFD46A;
+    --red:#FF5566; --cyan:#4FD8FF; --dim:#6a7186; --txt:#c8cdda;
+    --sans:'Helvetica Neue','Hiragino Kaku Gothic ProN',Arial,sans-serif;
+    --mono:'SF Mono','JetBrains Mono',Menlo,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#000;overflow:hidden;font-family:var(--sans);color:var(--txt)}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:#000;z-index:60;color:var(--dim);
+    letter-spacing:3px;font-size:11px;font-family:var(--mono)}
+  #loading .bar{margin-top:14px;width:220px;height:2px;background:#141a2c}
+  #loading .barfill{height:100%;width:0;background:var(--amber);transition:width .2s}
+
+  /* screen-space labels */
+  .plbl{position:fixed;transform:translate(-50%,-50%);font-family:var(--mono);
+    font-size:9.5px;letter-spacing:.14em;color:#fff;text-shadow:0 0 6px #000,0 0 3px #000;
+    white-space:nowrap;opacity:.9;pointer-events:none;z-index:6}
+  .plbl .d{display:inline-block;width:3px;height:3px;background:currentColor;margin-right:5px;vertical-align:1px}
+  .plbl.exp{color:var(--bright)} .plbl.imp{color:var(--cyan)} .plbl.evt{color:var(--red)}
+  .plbl.focal{font-size:15px;letter-spacing:.22em;opacity:1;color:#fff;text-align:center;
+    text-shadow:0 0 14px rgba(255,120,120,.8),0 0 4px #000}
+  .plbl.focal .sub{display:block;font-size:9px;letter-spacing:.18em;color:var(--bright);margin-top:4px}
+  .hidden{display:none}
+
+  /* depth of field + fog (screen space) */
+  .dof{position:fixed;left:0;right:0;pointer-events:none;backdrop-filter:blur(3px);
+    z-index:3}
+  #dofT{top:0;height:18%;-webkit-mask-image:linear-gradient(#000 20%,transparent)}
+  #dofB{bottom:0;height:24%;-webkit-mask-image:linear-gradient(transparent,#000 80%)}
+  #fog{position:fixed;inset:0;pointer-events:none;z-index:2;background:
+    radial-gradient(70% 55% at 8% 100%, rgba(235,238,245,.13), transparent 70%)}
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:4;background:
+    linear-gradient(rgba(0,0,0,.5), transparent 14%, transparent 82%, rgba(0,0,0,.6)),
+    radial-gradient(120% 100% at 50% 45%, transparent 62%, rgba(0,0,0,.45) 100%)}
+
+  /* ---------- chrome ---------- */
+  #brand{position:fixed;top:26px;left:30px;z-index:10}
+  #brand .t{font-size:19px;letter-spacing:.34em;color:#fff;font-weight:300}
+  #brand .s{font-size:8.5px;letter-spacing:.30em;color:var(--dim);margin-top:6px;line-height:1.8}
+  #clockbox{position:fixed;top:30px;right:32px;z-index:10;text-align:right;
+    font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--dim)}
+  #clockbox b{color:var(--txt);font-weight:400}
+
+  #lens{position:fixed;bottom:66px;left:50%;transform:translateX(-50%);z-index:10;
+    display:flex;gap:4px}
+  #lens button{background:rgba(0,0,0,.35);border:1px solid #262b38;color:var(--dim);
+    font-family:var(--sans);font-size:9.5px;letter-spacing:.24em;padding:8px 22px;cursor:pointer;
+    transition:all .3s;backdrop-filter:blur(2px)}
+  #lens button:hover{color:var(--txt);border-color:#3a4256}
+  #lens button.on{color:#fff;border-color:#8a93aa;background:rgba(255,255,255,.07)}
+  #lens button i{font-style:normal;color:var(--amber2);margin-right:8px;font-family:var(--mono)}
+
+  #lensinfo{position:fixed;left:30px;bottom:58px;z-index:10;max-width:430px}
+  #lensinfo .mark{width:34px;height:34px;border:1px solid #3a4256;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;margin-bottom:12px;position:relative}
+  #lensinfo .mark::before{content:'';position:absolute;inset:5px;border:1px solid #262b38;border-radius:50%}
+  #lensinfo .mark::after{content:'';width:6px;height:6px;background:var(--amber);border-radius:50%;
+    box-shadow:0 0 8px var(--amber)}
+  #lensinfo .nm{font-size:15px;letter-spacing:.16em;color:#fff;font-weight:300;
+    text-shadow:0 0 10px #000,0 1px 3px #000}
+  #lensinfo .en{font-family:var(--mono);font-size:8.5px;letter-spacing:.3em;color:var(--amber2);margin:4px 0 8px}
+  #lensinfo .ds{font-size:10.5px;line-height:1.9;color:#aab1c4;
+    text-shadow:0 0 8px #000,0 1px 3px #000,0 0 14px #000}
+
+  #strip{position:fixed;left:0;right:0;bottom:0;height:46px;z-index:9;
+    background:linear-gradient(transparent, rgba(0,0,0,.75) 30%);
+    display:flex;align-items:center;gap:26px;padding:6px 30px 4px 480px;
+    font-family:var(--mono)}
+  .fld{font-size:8.5px;letter-spacing:.12em;line-height:1.7;white-space:nowrap}
+  .fld .k{color:var(--dim)} .fld .v{color:var(--txt)}
+  .fld .v.a{color:var(--bright)} .fld .v.r{color:var(--red)} .fld .v.g{color:#3ddc84}
+  #hist{width:230px;height:34px;flex:0 0 auto}
+
+  #side{position:fixed;right:32px;top:110px;z-index:10;width:250px;font-family:var(--mono)}
+  #side .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:5px 0;border-bottom:1px solid #171b26;font-size:9.5px;letter-spacing:.08em}
+  #side .row .k{color:var(--dim)} #side .row .v{color:var(--txt)}
+  #side .row .v.a{color:var(--bright)} #side .row .v.r{color:var(--red)}
+  #side .row .v.c{color:var(--cyan)} #side .row .v.g{color:#3ddc84}
+  #side .hd{font-family:var(--sans);font-size:9px;letter-spacing:.3em;color:var(--dim);
+    padding-bottom:8px}
+  #side .bar{height:3px;background:#171b26;margin:3px 0 7px;position:relative}
+  #side .bar i{position:absolute;left:0;top:0;bottom:0}
+  @media(max-width:1100px){
+    #lensinfo{bottom:150px;max-width:330px}
+    #side{width:212px;top:150px;background:rgba(0,0,0,.35);padding:10px;backdrop-filter:blur(2px)}
+    #brand .t{font-size:13px;letter-spacing:.24em}
+    #brand .s{font-size:7.5px}
+    #clockbox{top:10px;right:14px;font-size:7.5px}
+  }
+</style>
+
+<div id="app"></div>
+<div id="loading">RESULT INDEX — LOADING EARTH<div class="bar"><div class="barfill" id="lbar"></div></div></div>
+<div id="fog"></div><div class="dof" id="dofT"></div><div class="dof" id="dofB"></div><div id="vig"></div>
+<div id="plabels"></div>
+
+<div id="brand">
+  <div class="t">THE BANANA OF WALL STREET</div>
+  <div class="s">RESULT INDEX — 12 MONTHS OF NON-PROFIT TRADING<br>2025-08 → 2026-07 · MODEL: PATCHTST (BANANA ONLY)</div>
+</div>
+<div id="clockbox"><b id="clk"></b><br>PINK SHEET 2026-06 · BANANA-US <b>$1.18/KG</b></div>
+
+<div id="lensinfo">
+  <div class="mark"></div>
+  <div class="nm" id="liNm"></div>
+  <div class="en" id="liEn"></div>
+  <div class="ds" id="liDs"></div>
+</div>
+
+<div id="side"></div>
+
+<div id="strip">
+  <canvas id="hist" width="460" height="68"></canvas>
+  <div id="fields" style="display:flex;gap:26px"></div>
+</div>
+
+<div id="lens">
+  <button data-v="0"><i>1</i>数値 NUMBERS</button>
+  <button data-v="1"><i>2</i>バナナ BANANA</button>
+  <button data-v="2"><i>3</i>世界 WORLD</button>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= DATA ================================================
+   Fallback values — live state is fetched from data/nav.json,
+   which terminal/scripts/export_to_artwork.py regenerates monthly. */
+let MONTHS=[
+ {m:'25-08',ret: 1.84},{m:'25-09',ret: 8.22},{m:'25-10',ret: 2.89},{m:'25-11',ret:-0.37},
+ {m:'25-12',ret: 0.75},{m:'26-01',ret: 4.48},{m:'26-02',ret: 0.94},{m:'26-03',ret:-5.82},
+ {m:'26-04',ret:12.85},{m:'26-05',ret: 9.56},{m:'26-06',ret:-3.99},{m:'26-07',ret:-2.80},
+];
+let PNL=30467, NAVX=1.3047;
+let BAN={count:761,kg:114,prevJan:473};
+const CHAIN=[
+ {k:'小売・流通 (北)', v:16800, c:'#cfd6e6'},
+ {k:'輸入商社 (北)',   v:6100,  c:'#8a93aa'},
+ {k:'海運・熟成 (北)', v:4000,  c:'#5a627e'},
+ {k:'生産国側',        v:2650,  c:'#B07E1E'},
+ {k:'うち農園労働者',  v:917,   c:'#FFB627'},
+];
+const ETFS=[
+ {tk:'GLD',lat:51.51,lon:-0.13, pred: .139,held:1},
+ {tk:'XLK',lat:37.34,lon:-121.89,pred:.109,held:1},
+ {tk:'SPY',lat:40.71,lon:-74.01,pred: .014,held:1},
+ {tk:'XLP',lat:39.10,lon:-84.51,pred:-.002,held:0},
+ {tk:'DBA',lat:41.88,lon:-87.63,pred:-.020,held:0},
+ {tk:'QQQ',lat:40.75,lon:-73.98,pred:-.094,held:0},
+ {tk:'TLT',lat:38.90,lon:-77.04,pred:-.153,held:0},
+ {tk:'EEM',lat:31.23,lon:121.47,pred:-.271,held:0},
+];
+const EXP=[
+ {n:'ECUADOR',lat:-1.83,lon:-78.18,w:.28},{n:'GUATEMALA',lat:15.78,lon:-90.23,w:.21},
+ {n:'PHILIPPINES',lat:12.88,lon:121.77,w:.12},{n:'COSTA RICA',lat:9.75,lon:-83.75,w:.10},
+ {n:'COLOMBIA',lat:4.57,lon:-74.30,w:.09},{n:'CAMEROON',lat:4.15,lon:9.29,w:.05},
+];
+const IMP=[
+ {n:'EU',lat:51.92,lon:4.48},{n:'USA',lat:40.71,lon:-74.01},
+ {n:'JAPAN',lat:35.68,lon:139.69},{n:'CHINA',lat:31.23,lon:121.47},
+];
+const EVENTS=[
+ {n:'AI CAPEX BOOM → XLK',lat:37.34,lon:-121.89,c:'cyan', d:'2025-H2〜'},
+ {n:'GOLD HEDGE DEMAND → GLD',lat:51.51,lon:-0.13,c:'amber',d:'2025-09〜'},
+ {n:'GLOBAL SELLOFF −5.82%',lat:40.71,lon:-74.01,c:'red', d:'2026-03',dy:-22},
+ {n:'REBOUND +12.85%',lat:40.71,lon:-74.01,c:'white',d:'2026-04',dy:14},
+ {n:'TR4 PANAMA DISEASE',lat:-1.83,lon:-78.18,c:'red', d:'BANANA BELT',dy:14},
+ {n:'DATA SILENCE (FRED HALT)',lat:38.90,lon:-77.04,c:'dim', d:'2025-12',dy:34},
+];
+const WALL={lat:40.71,lon:-74.01}, BELT={lat:8,lon:-80}, TOKYO={lat:35.68,lon:139.69};
+
+/* ================= SCENE ================= */
+const R=1.0;
+const app=document.getElementById('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+app.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+window.__scene=scene; // debug handle
+scene.background=new THREE.Color('#020408');
+const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,0.01,100);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=.06;
+controls.minDistance=1.35; controls.maxDistance=6; controls.enablePan=false;
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.6,0.5,0.85);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+function toVec(lat,lon,r=R){
+  const ph=(90-lat)*Math.PI/180, th=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(-r*Math.sin(ph)*Math.cos(th), r*Math.cos(ph), r*Math.sin(ph)*Math.sin(th));
+}
+
+/* ---------- earth (night-lit, LEDIX dark) ---------- */
+const uSunDir={value:toVec(15,95,1).normalize()}; // day over Asia — Americas/Atlantic stay night
+const loader=new THREE.TextureLoader();
+let loaded=0; const TOTAL=3;
+function tex(url,srgb=true){return new Promise((res,rej)=>loader.load(url,t=>{
+  if(srgb)t.colorSpace=THREE.SRGBColorSpace;
+  t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  loaded++; document.getElementById('lbar').style.width=(loaded/TOTAL*100)+'%'; res(t);
+},undefined,rej));}
+
+async function buildEarth(){
+  const dayUrl=renderer.capabilities.maxTextureSize>=16384?'tex/color_16k.jpg':'tex/color_8k.jpg';
+  const [tDay,tNight,tStars]=await Promise.all([
+    tex(dayUrl), tex('tex/night_8k.jpg'), tex('tex/stars_8k.jpg'),
+  ]);
+  const earth=new THREE.Mesh(
+    new THREE.SphereGeometry(R,128,128),
+    new THREE.ShaderMaterial({
+      uniforms:{tDay:{value:tDay},tNight:{value:tNight},uSunDir},
+      vertexShader:`
+        varying vec2 vUv; varying vec3 vN;
+        void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal);
+          gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader:`
+        uniform sampler2D tDay,tNight; uniform vec3 uSunDir;
+        varying vec2 vUv; varying vec3 vN;
+        void main(){
+          float ndl=dot(normalize(vN),uSunDir);
+          float dayF=smoothstep(-0.12,0.3,ndl);
+          vec3 day=texture2D(tDay,vUv).rgb*(0.10+0.85*clamp(ndl,0.,1.));
+          vec3 nt=texture2D(tNight,vUv).rgb;
+          vec3 night=pow(nt,vec3(1.35))*vec3(1.0,0.74,0.42)*1.9 + vec3(.012,.016,.028);
+          gl_FragColor=vec4(mix(night,day*0.55,dayF),1.0);
+        }`
+    }));
+  scene.add(earth);
+  const atmo=new THREE.Mesh(new THREE.SphereGeometry(R*1.13,96,64),
+    new THREE.ShaderMaterial({transparent:true,blending:THREE.AdditiveBlending,side:THREE.BackSide,depthWrite:false,
+      uniforms:{c:{value:new THREE.Color(0x2a4a8f)}},
+      vertexShader:`varying vec3 vN; varying vec3 vP;
+        void main(){ vN=normalize(normalMatrix*normal);
+          vec4 mv=modelViewMatrix*vec4(position,1.0); vP=normalize(-mv.xyz);
+          gl_Position=projectionMatrix*mv; }`,
+      fragmentShader:`varying vec3 vN; varying vec3 vP; uniform vec3 c;
+        void main(){ float f=pow(1.0-abs(dot(vN,vP)),2.8); gl_FragColor=vec4(c,f*0.75); }`}));
+  scene.add(atmo);
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,32),
+    new THREE.MeshBasicMaterial({map:tStars,side:THREE.BackSide,color:0x8890a4,depthWrite:false})));
+}
+
+/* ---------- tangent-plane group at lat/lon ---------- */
+function tangentGroup(lat,lon,lift=0.012){
+  const n=toVec(lat,lon).normalize();
+  const g=new THREE.Group();
+  g.position.copy(n.clone().multiplyScalar(R+lift));
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),n);
+  scene.add(g); return g;
+}
+function circlePts(r,segs=96,frac=1,start=0){
+  const p=[];
+  for(let i=0;i<=segs*frac;i++){const a=start+i/segs*Math.PI*2;
+    p.push(new THREE.Vector3(Math.cos(a)*r,Math.sin(a)*r,0));}
+  return p;
+}
+function lineLoop(g,r,col,op,frac=1,start=0){
+  const geo=new THREE.BufferGeometry().setFromPoints(circlePts(r,96,frac,start));
+  const m=new THREE.Line(geo,new THREE.LineBasicMaterial({color:col,transparent:true,
+    opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}));
+  g.add(m); return m;
+}
+function ringMesh(g,rIn,rOut,col,op){
+  const m=new THREE.Mesh(new THREE.RingGeometry(rIn,rOut,128),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  g.add(m); return m;
+}
+/* LEDIX ring system on the sphere */
+function ledixRing(g,Rr,colMain){
+  for(let i=0;i<8;i++)lineLoop(g,Rr*(0.44+0.075*i),0xffffff,0.05+0.02*(i%3));
+  ringMesh(g,Rr*.985,Rr*1.015,colMain,.9);
+  ringMesh(g,Rr*.965,Rr*1.035,colMain,.28);
+  const a1=ringMesh(g,Rr*1.045,Rr*1.055,0xffffff,.5); a1.geometry=new THREE.RingGeometry(Rr*1.045,Rr*1.055,64,1,0,1.1);
+  const a2=ringMesh(g,Rr*1.075,Rr*1.082,0xffffff,.35); a2.geometry=new THREE.RingGeometry(Rr*1.075,Rr*1.082,64,1,2.5,1.9);
+  return [a1,a2];
+}
+/* great-circle arc between two lat/lon */
+function gcArc(a,b,bow=0.14,col=0x9aa4b2,op=.4){
+  const v0=toVec(a.lat,a.lon),v1=toVec(b.lat,b.lon);
+  const ang=v0.angleTo(v1), pts=[];
+  if(ang<0.01){ // degenerate (same location, e.g. WALL ST → SPY): tiny lifted stub
+    for(let i=0;i<=90;i++)pts.push(v0.clone().normalize().multiplyScalar(R*1.012));
+    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0,depthWrite:false}));
+    scene.add(line); return {line,pts};
+  }
+  for(let i=0;i<=90;i++){const u=i/90;
+    const p=v0.clone().multiplyScalar(Math.sin((1-u)*ang)/Math.sin(ang))
+      .add(v1.clone().multiplyScalar(Math.sin(u*ang)/Math.sin(ang)));
+    p.normalize().multiplyScalar(R*(1+0.012+Math.sin(Math.PI*u)*(bow*ang)));
+    pts.push(p);}
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:col,transparent:true,opacity:op,
+      blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(line); return {line,pts};
+}
+const flowTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;
+  const g=c.getContext('2d'),rg=g.createRadialGradient(32,32,0,32,32,32);
+  rg.addColorStop(0,'rgba(255,255,255,1)');rg.addColorStop(.4,'rgba(255,210,120,.7)');
+  rg.addColorStop(1,'rgba(255,180,60,0)');g.fillStyle=rg;g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);})();
+function flowSprite(col,scale=.032){
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:flowTex,color:col,
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  sp.scale.setScalar(scale); scene.add(sp); return sp;
+}
+
+/* ================= LENS CONTENT (3 groups, toggled) ================= */
+const lensRoot=[new THREE.Group(),new THREE.Group(),new THREE.Group()];
+lensRoot.forEach(g=>{scene.add(g); g.visible=false;});
+const anims=[[],[],[]];   // per-lens per-frame animators
+const labelSets=[[],[],[]]; // {pos:Vector3(world), html, cls, dy}
+
+function A(v,fn){anims[v].push(fn);}
+function L(v,pos,html,cls='',dy=-11){labelSets[v].push({pos,html,cls,dy});}
+
+/* -------- LENS 0 · NUMBERS @ Wall St -------- */
+function buildLens0(){
+  const root=lensRoot[0];
+  const g=tangentGroup(WALL.lat,WALL.lon); root.add(g); scene.remove(g); root.add(g);
+  ledixRing(g,0.115,0xff5566);
+  // monthly NAV arcs
+  const maxAbs=13;
+  MONTHS.forEach((m,i)=>{
+    const r=0.024+i*0.0062, frac=Math.min(.46,Math.abs(m.ret)/maxAbs*.46)+.02;
+    const col=m.ret>=0?0xffd27a:0xff5a64;
+    const ln=lineLoop(g,r,col,i===11?.95:.6,frac,Math.PI/2*(m.ret>=0?1:-1));
+    if(i===11)A(0,t=>{ln.material.opacity=.7+.25*Math.sin(t*3);});
+  });
+  // permutation-null dust annulus
+  const N=700, pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const a=Math.random()*7;
+    const rr=0.115+(Math.random()+Math.random()+Math.random()-1.5)*0.016;
+    pos[i*3]=Math.cos(a)*rr; pos[i*3+1]=Math.sin(a)*rr; pos[i*3+2]=0.002;}
+  const dust=new THREE.Points(new THREE.BufferGeometry(),
+    new THREE.PointsMaterial({color:0xff8890,size:.0035,transparent:true,opacity:.4,
+      blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));
+  dust.geometry.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.add(dust); A(0,t=>{dust.rotation.z=t*.02; dust.material.opacity=.3+.12*Math.sin(t*1.3);});
+  // ETF spokes
+  ETFS.forEach(e=>{
+    const {line}=gcArc(WALL,e,0.1,0x9aa4b2,e.held?.5:.16); scene.remove(line); root.add(line);
+    const p=toVec(e.lat,e.lon,R+.012);
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(e.held?.007:.0045,10,8),
+      new THREE.MeshBasicMaterial({color:e.held?0xffd46a:0x6a7186}));
+    dot.position.copy(p); root.add(dot);
+    L(0,p,`<span class="d"></span>${e.tk} ${(e.pred>=0?'+':'')+(e.pred*100).toFixed(1)}%`, e.held?'exp':'');
+  });
+  L(0,toVec(WALL.lat,WALL.lon,R+.02),
+    `NAV ${NAVX.toFixed(4)}<span style="font-size:10px">x</span><span class="sub">${PNL>=0?'+':'−'}¥${Math.abs(PNL).toLocaleString()} · p=0.227 · SIGNAL: NOISE</span>`,'focal',-46);
+}
+
+/* -------- LENS 1 · BANANA @ Belt -------- */
+function buildLens1(){
+  const root=lensRoot[1];
+  const g=tangentGroup(BELT.lat,BELT.lon); scene.remove(g); root.add(g);
+  ledixRing(g,0.155,0xffb627);
+  // value-chain bands
+  let r=0.052;
+  CHAIN.forEach((s,i)=>{ if(s.k.startsWith('うち'))return;
+    const w=Math.max(.002, s.v/PNL*.05);
+    const band=ringMesh(g,r,r+w,new THREE.Color(s.c),.055);
+    A(1,t=>{band.material.opacity=.045+.02*Math.sin(t+i);});
+    r+=w+.004;});
+  const wr=lineLoop(g,r+.012,0xffb627,.85); // the worker's thin ring
+  A(1,t=>{wr.material.opacity=.6+.3*Math.sin(t*2.2);});
+  // 761 bananas — phyllotaxis, rotting outward
+  const N=BAN.count, pos=new Float32Array(N*3), col=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const k=i+1, rr=.0032*Math.sqrt(k)*1.28, a=k*2.39996;
+    pos[i*3]=Math.cos(a)*rr; pos[i*3+1]=Math.sin(a)*rr; pos[i*3+2]=.002;
+    const rot=i/N;
+    col[i*3]=(255-rot*175)/255; col[i*3+1]=(205-rot*160)/255; col[i*3+2]=(80-rot*50)/255;}
+  const nanas=new THREE.Points(new THREE.BufferGeometry(),
+    new THREE.PointsMaterial({vertexColors:true,size:.0042,transparent:true,opacity:.95,
+      blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true}));
+  nanas.geometry.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  nanas.geometry.setAttribute('color',new THREE.BufferAttribute(col,3));
+  g.add(nanas); A(1,t=>{nanas.rotation.z=t*.03;});
+  // purchase flows exporters → Tokyo + thin cyan return
+  EXP.forEach((e,i)=>{
+    const {line,pts}=gcArc(e,TOKYO,.13,0xffb627,.35); scene.remove(line); root.add(line);
+    const sp=flowSprite(0xffd46a); scene.remove(sp); root.add(sp);
+    A(1,t=>{const u=(t*.05+i*.17)%1;
+      sp.position.copy(pts[Math.floor(u*(pts.length-1))]);
+      sp.material.opacity=Math.sin(u*Math.PI)*.95;});
+    if(e.w>=.09)L(1,toVec(e.lat,e.lon,R+.012),`<span class="d"></span>${e.n} ${(e.w*100|0)}%`,'exp');
+  });
+  const back=gcArc(TOKYO,BELT,.16,0x4fd8ff,.4); scene.remove(back.line); root.add(back.line);
+  const bsp=flowSprite(0x4fd8ff,.035); scene.remove(bsp); root.add(bsp);
+  A(1,t=>{const u=(t*.04)%1;
+    bsp.position.copy(back.pts[Math.floor(u*(back.pts.length-1))]);
+    bsp.material.opacity=Math.sin(u*Math.PI)*.9;});
+  L(1,toVec(TOKYO.lat,TOKYO.lon,R+.012),'<span class="d"></span>TOKYO 小売 ¥40/本','imp');
+  const dJan=BAN.count-BAN.prevJan;
+  L(1,toVec(BELT.lat,BELT.lon,R+.02),
+    `${BAN.count} BANANAS<span class="sub">≈${BAN.kg} KG · ${dJan>=0?'+':''}${dJan} SINCE JAN · そして腐る</span>`,'focal',-52);
+}
+
+/* -------- LENS 2 · WORLD -------- */
+function buildLens2(){
+  const root=lensRoot[2];
+  const gb=tangentGroup(BELT.lat,BELT.lon); scene.remove(gb); root.add(gb);
+  ledixRing(gb,0.085,0xffb627);
+  const gn=tangentGroup(WALL.lat,WALL.lon); scene.remove(gn); root.add(gn);
+  ledixRing(gn,0.06,0xff5566);
+  // trade arcs (amber) + capital arcs (cyan)
+  EXP.forEach((e,i)=>{
+    IMP.forEach((im,j)=>{ if((i+j)%2)return;
+      const {line,pts}=gcArc(e,im,.15,0xffb627,.3); scene.remove(line); root.add(line);
+      const sp=flowSprite(0xffd46a,.028); scene.remove(sp); root.add(sp);
+      A(2,t=>{const u=(t*.045+(i*.31+j*.5))%1;
+        sp.position.copy(pts[Math.floor(u*(pts.length-1))]);
+        sp.material.opacity=Math.sin(u*Math.PI)*.9;});});
+    const cap=gcArc(e,WALL,.10,0x4fd8ff,.22); scene.remove(cap.line); root.add(cap.line);
+    const csp=flowSprite(0x4fd8ff,.03); scene.remove(csp); root.add(csp);
+    A(2,t=>{const u=(t*.06+i*.2)%1;
+      csp.position.copy(cap.pts[Math.floor(u*(cap.pts.length-1))]);
+      csp.material.opacity=Math.sin(u*Math.PI)*.8;});});
+  // event pulse rings
+  EVENTS.forEach((e,i)=>{
+    const col=e.c==='red'?0xff5566:(e.c==='cyan'?0x4fd8ff:(e.c==='amber'?0xffb627:0xc8cdda));
+    const g=tangentGroup(e.lat,e.lon,.014); scene.remove(g); root.add(g);
+    const pulse=lineLoop(g,.02,col,.5);
+    A(2,t=>{const cyc=(t*.45+i*.6)%2;
+      pulse.scale.setScalar(1+cyc*2.4); pulse.material.opacity=Math.max(0,.55-cyc*.3);});
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(.005,10,8),new THREE.MeshBasicMaterial({color:col}));
+    root.add(dot); dot.position.copy(toVec(e.lat,e.lon,R+.012));
+    L(2,toVec(e.lat,e.lon,R+.012),`<span class="d"></span>${e.n}`,
+      e.c==='red'?'evt':(e.c==='cyan'?'imp':'exp'), e.dy||-11);
+  });
+  IMP.forEach(i2=>L(2,toVec(i2.lat,i2.lon,R+.01),i2.n,'imp',12));
+  L(2,toVec(BELT.lat,BELT.lon,R+.02),
+    'BANANA BELT<span class="sub">$1.02 → $1.18 /KG · ほぼ沈黙</span>','focal',34);
+}
+
+/* ================= VIEWS / camera flights ================= */
+let VIEWS=[];
+function makeViews(){
+  const retStr=`${NAVX>=1?'+':''}${((NAVX-1)*100).toFixed(2)}%`;
+  const pnlStr=`${PNL>=0?'+':'−'}¥${Math.abs(PNL).toLocaleString()}`;
+  VIEWS=[
+   {lat:WALL.lat,lon:WALL.lon,dist:1.9,tilt:-.09,
+    nm:'数値の視点', en:'LENS 01 — STATISTICAL',
+    ds:`${MONTHS.length}ヶ月・${retStr}。しかしシグナルの正体はノイズ（IC +0.039, p=0.227）。リングは月次NAVの成長、周囲の塵は並べ替え帰無分布——実測ICはその只中にいる。有意性なき利益の肖像。`},
+   {lat:BELT.lat,lon:BELT.lon,dist:1.9,tilt:-.09,
+    nm:'バナナの視点', en:'LENS 02 — MATERIAL',
+    ds:`${pnlStr}はバナナ${BAN.count}本／約${BAN.kg}kgに変換される。粒のひとつひとつが1本のバナナ。外側ほど古く、腐敗が進む。同心のバンドは代金の行方——大半は北に留まり、農園労働者に届くのは推計¥${CHAIN[4].v.toLocaleString()}。`},
+   {lat:26,lon:-45,dist:3.0,tilt:-.06,
+    nm:'世界の視点', en:'LENS 03 — GEOPOLITICAL',
+    ds:'利益の出所はバナナではなく世界だった。AIブームがXLKを、ヘッジ需要が金を押し上げ、3月の急落と4月の反発が通過した。琥珀のアークは南から北への果実、シアンは資本。バナナベルトは静かなまま。'},
+  ];
+}
+let view=0, flight=null;
+function camPosFor(v){
+  const n=toVec(v.lat,v.lon).normalize();
+  const north=new THREE.Vector3(0,1,0).sub(n.clone().multiplyScalar(n.y)).normalize();
+  return n.clone().add(north.multiplyScalar(v.tilt)).normalize().multiplyScalar(v.dist);
+}
+function setView(v){
+  view=v;
+  lensRoot.forEach((g,i)=>g.visible=(i===v));
+  flight={from:camera.position.clone(),to:camPosFor(VIEWS[v]),t0:performance.now(),dur:1900};
+  document.querySelectorAll('#lens button').forEach((b,i)=>b.classList.toggle('on',i===v));
+  document.getElementById('liNm').textContent=VIEWS[v].nm;
+  document.getElementById('liEn').textContent=VIEWS[v].en;
+  document.getElementById('liDs').textContent=VIEWS[v].ds;
+  buildSide(v); buildFields(v); buildLabels(v);
+}
+document.querySelectorAll('#lens button').forEach(b=>b.onclick=()=>setView(+b.dataset.v));
+addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='3')setView(+e.key-1)});
+
+/* ================= screen labels ================= */
+const plabels=document.getElementById('plabels');
+let labelEls=[];
+function buildLabels(v){
+  labelEls.forEach(e=>e.remove()); labelEls=[];
+  labelSets[v].forEach(d=>{const el=document.createElement('div');
+    el.className='plbl '+d.cls; el.innerHTML=d.html;
+    plabels.appendChild(el); labelEls.push(el);});
+}
+const _tmp=new THREE.Vector3(), _cam=new THREE.Vector3();
+function syncLabels(){
+  camera.getWorldPosition(_cam);
+  labelSets[view].forEach((d,i)=>{
+    const el=labelEls[i]; if(!el)return;
+    _tmp.copy(d.pos);
+    const nrm=d.pos.clone().normalize();
+    const toCam=_cam.clone().sub(d.pos).normalize();
+    _tmp.project(camera);
+    if(_tmp.z>1||nrm.dot(toCam)<0.02){el.classList.add('hidden');return;}
+    el.classList.remove('hidden');
+    el.style.left=(_tmp.x*.5+.5)*innerWidth+'px';
+    el.style.top=(-_tmp.y*.5+.5)*innerHeight+(d.dy||0)+'px';
+  });
+}
+
+/* ================= side / fields / hist (same data as flat ver.) ================= */
+function buildSide(v){
+  const s=document.getElementById('side'); let h='';
+  if(v===0){
+    const wins=MONTHS.filter(m=>m.ret>0).length;
+    h='<div class="hd">OBJECTIVE READOUT</div>';
+    [['NAV',NAVX.toFixed(4)+'x','a'],
+     ['TOTAL RETURN',(NAVX>=1?'+':'')+((NAVX-1)*100).toFixed(2)+'%',NAVX>=1?'g':'r'],
+     ['WIN RATE',`${wins} / ${MONTHS.length} MO`,'v'],
+     ['MEAN MONTHLY IC','+0.039','v'],['PERMUTATION p','0.227','r'],['NULL PERCENTILE','88th','v'],
+     ['SCATTER r','0.006','r'],['VERDICT','NO SIGNAL','r'],
+     ['AND YET',(PNL>=0?'+':'−')+'¥'+Math.abs(PNL).toLocaleString(),'a']]
+     .forEach(([k,val,c])=>h+=`<div class="row"><span class="k">${k}</span><span class="v ${c}">${val}</span></div>`);
+  }
+  if(v===1){
+    h='<div class="hd">¥30,467 の行方（推計）</div>';
+    CHAIN.forEach(c=>{const pct=c.v/PNL*100;
+      h+=`<div class="row"><span class="k">${c.k}</span><span class="v" style="color:${c.c}">¥${c.v.toLocaleString()}</span></div>
+      <div class="bar"><i style="width:${pct}%;background:${c.c}"></i></div>`;});
+    h+=`<div class="row"><span class="k">労働者への到達率</span><span class="v a">3.0%</span></div>`;
+  }
+  if(v===2){
+    h='<div class="hd">WORLD EVENTS → PORTFOLIO</div>';
+    EVENTS.forEach(e=>{const col=e.c==='red'?'r':(e.c==='cyan'?'c':(e.c==='amber'?'a':'v'));
+      h+=`<div class="row"><span class="k">${e.d}</span><span class="v ${col}">${e.n}</span></div>`;});
+    h+=`<div class="row"><span class="k">南→北 輸送量</span><span class="v a">98%</span></div>`;
+  }
+  s.innerHTML=h;
+}
+function buildFields(v){
+  const base=[['Period:',`20${MONTHS[0].m} → 20${MONTHS[MONTHS.length-1].m}`],['Model:','PatchTST · banana only'],
+    ['NAV / PnL:',`${NAVX.toFixed(4)}x  ${PNL>=0?'+':'−'}¥${Math.abs(PNL).toLocaleString()}`,'a'],['IC / p:','+0.039 / 0.227','r']];
+  const per={0:[['Lens:','STATISTICAL']],1:[['Bananas:',`${BAN.count}本 · ${BAN.kg}kg`,'a']],2:[['Flows:','98% SOUTH→NORTH','a']]};
+  document.getElementById('fields').innerHTML=[...base,...per[v]].map(([k,val,c])=>
+    `<div class="fld"><span class="k">${k}</span><br><span class="v ${c||''}">${val}</span></div>`).join('');
+}
+function drawHist(){
+  const c=document.getElementById('hist').getContext('2d');
+  c.clearRect(0,0,460,68);
+  const bw=460/MONTHS.length, mid=40, mx=Math.max(13,...MONTHS.map(m=>Math.abs(m.ret)));
+  c.font='8px Menlo,monospace';
+  MONTHS.forEach((m,i)=>{
+    const x=i*bw+6, bh=Math.abs(m.ret)/mx*26;
+    c.fillStyle=m.ret>=0?'rgba(90,220,140,.9)':'rgba(255,85,102,.9)';
+    c.fillRect(x, m.ret>=0?mid-bh:mid, bw-9, bh);
+    c.fillStyle='rgba(120,128,150,.8)'; c.fillText(m.m.slice(3),x,58);
+  });
+  c.fillStyle='rgba(120,128,150,.5)'; c.fillRect(0,mid,460,1);
+}
+
+/* ================= loop ================= */
+const clock=new THREE.Clock();
+const ease=u=>u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;
+let _ft=[],_deg=false,_prev=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const t=clock.getElapsedTime();
+  if(_prev&&!_deg){_ft.push(now-_prev);
+    if(_ft.length>90){const avg=_ft.slice(-60).reduce((a,b)=>a+b,0)/60;
+      if(avg>30){_deg=true;document.querySelectorAll('.dof').forEach(e=>e.remove());
+        renderer.setPixelRatio(1);}}}
+  _prev=now;
+  if(flight){
+    const u=Math.min(1,(now-flight.t0)/flight.dur);
+    camera.position.lerpVectors(flight.from,flight.to,ease(u));
+    if(u>=1)flight=null;
+  }
+  controls.update();
+  anims[view].forEach(f=>f(t));
+  composer.render();
+  syncLabels();
+}
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
+  bloom.setSize(innerWidth,innerHeight);
+});
+setInterval(()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+  document.getElementById('clk').textContent=
+   `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} JST`;},1000);
+
+/* live data from the terminal export; embedded fallback on failure (e.g. file://) */
+async function loadData(){
+  try{
+    const d=await(await fetch('data/nav.json')).json();
+    if(!d||!d.months)return;
+    MONTHS=d.months.map(x=>({m:x.m,ret:x.ret,nav:x.nav}));
+    NAVX=d.nav; PNL=d.pnl;
+    if(d.bananas){BAN.count=d.bananas.count;BAN.kg=d.bananas.kg;}
+    else{BAN.count=Math.floor(Math.abs(PNL)/40);BAN.kg=Math.round(BAN.count*.15);}
+    const jan=d.months.find(x=>x.m==='26-01');
+    if(jan)BAN.prevJan=Math.floor(Math.abs((jan.nav-1)*(d.principal||100000))/40);
+    const frac=[.5514,.2002,.1313,.087,.0301];   // value-chain split (推計)
+    CHAIN.forEach((c,i)=>c.v=Math.round(frac[i]*Math.abs(PNL)));
+  }catch(e){/* keep embedded fallback */}
+}
+
+Promise.all([buildEarth(),loadData()]).then(()=>{
+  makeViews(); buildLens0(); buildLens1(); buildLens2(); drawHist();
+  document.getElementById('loading').remove();
+  camera.position.copy(camPosFor(VIEWS[0]));
+  setView(0); flight=null;
+  requestAnimationFrame(loop);
+}).catch(err=>{
+  document.getElementById('loading').textContent='TEXTURE LOAD FAILED: '+err;
+  console.error(err);
+});
+</script>

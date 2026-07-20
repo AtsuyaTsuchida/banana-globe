@@ -3,15 +3,16 @@
 Everything here is derived from the project's real data — no invented numbers.
 Outputs evidence.json (embedded/loaded by evidence.html).
 
-Run:  cd ~/the_banana_of_wallstreet_1 && uv run python ~/dev/banana-globe/build_evidence.py
+Run:  cd ../terminal && uv run python ../globe/build_evidence.py
 """
 from __future__ import annotations
 import json, numpy as np, pandas as pd
 from pathlib import Path
 from scipy import stats
 
-PROJ = Path.home() / "the_banana_of_wallstreet_1"
-OUT  = Path.home() / "dev/banana-globe/evidence.json"
+_HERE = Path(__file__).resolve().parent          # .../banana-of-wall-street/globe
+PROJ = _HERE.parent / "terminal"
+OUT  = _HERE / "evidence.json"
 rng  = np.random.default_rng(42)
 
 pred = pd.read_parquet(PROJ / "data/processed/predictions.parquet")
