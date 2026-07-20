@@ -1,0 +1,323 @@
+<meta charset="utf-8" />
+<title>BANANA CHRONICLE 3D — 時間の谷 · TBOW</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:#0a0e17cc; --border:#1c2436;
+    --amber:#FFB627; --amber2:#B07E1E; --bright:#FFD46A; --dim:#5a6478;
+    --cash:#56718f; --pos:#22c55e; --neg:#ef4444; --neu:#38bdf8;
+    --txt:#c8cdda; --ink:#8b93a7;
+    --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
+    --sans:'Helvetica Neue','Hiragino Kaku Gothic ProN',Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);overflow:hidden;color:var(--txt);font-family:var(--sans)}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+
+  #ttl{position:fixed;top:22px;left:28px;z-index:10}
+  #ttl .a{font-size:16px;letter-spacing:.3em;color:#fff;font-weight:300}
+  #ttl .b{font-size:8px;letter-spacing:.26em;color:var(--amber2);margin-top:5px}
+
+  /* left readout */
+  #ro{position:fixed;left:28px;top:86px;z-index:10;width:250px;font-family:var(--mono);
+    background:var(--panel);border:1px solid var(--border);padding:12px 14px;backdrop-filter:blur(3px)}
+  #ro .r{display:flex;justify-content:space-between;padding:4px 0;font-size:10px;
+    border-bottom:1px solid #131a2a}
+  #ro .r:last-child{border:none}
+  #ro .k{color:var(--dim);letter-spacing:.12em} #ro .v{color:var(--txt)}
+  #ro .v.am{color:var(--bright)} #ro .v.up{color:var(--pos)} #ro .v.dn{color:var(--neg)}
+  #ro .v.cs{color:var(--cash)}
+  #evlog{position:fixed;left:28px;top:295px;z-index:10;width:250px;font-family:var(--mono);
+    font-size:9px;line-height:2;color:var(--dim)}
+  #evlog .e{opacity:.35} #evlog .e.hot{opacity:1;color:var(--bright)}
+
+  /* big date */
+  #date{position:fixed;right:340px;top:44%;z-index:10;font-family:var(--mono);
+    font-size:26px;letter-spacing:.14em;color:#fff;text-shadow:0 0 18px #000}
+  #date small{display:block;font-size:9px;color:var(--dim);letter-spacing:.3em;margin-top:4px}
+
+  /* right chronological strip */
+  #strip{position:fixed;right:28px;top:70px;bottom:86px;width:270px;z-index:10;
+    background:var(--panel);border:1px solid var(--border);backdrop-filter:blur(3px);
+    padding:10px}
+  #strip .h{font-size:8.5px;letter-spacing:.22em;color:var(--dim);font-family:var(--mono);
+    margin-bottom:8px;text-align:right}
+  #stripcv{width:100%;height:calc(100% - 22px)}
+
+  /* transport */
+  #tr{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:10;
+    display:flex;align-items:center;gap:8px;width:min(760px,80vw)}
+  .btn{background:#0a0e17dd;border:1px solid var(--border);color:var(--ink);
+    font-family:var(--mono);font-size:10px;letter-spacing:.1em;padding:6px 16px;cursor:pointer}
+  .btn:hover{border-color:var(--amber);color:var(--amber)}
+  .btn.on{background:var(--amber);color:#000;border-color:var(--amber)}
+  #scrub{flex:1;accent-color:var(--amber);height:2px}
+  #hint{position:fixed;left:28px;bottom:56px;z-index:10;font-family:var(--mono);
+    font-size:8.5px;color:var(--dim);letter-spacing:.08em}
+</style>
+
+<div id="app"></div>
+
+<div id="ttl"><div class="a">BANANA CHRONICLE 3D</div>
+  <div class="b">THE BANANA OF WALL STREET — 1960–2026 · 時間の谷</div></div>
+
+<div id="ro">
+  <div class="r"><span class="k">PRICE</span><span class="v am" id="roP">—</span></div>
+  <div class="r"><span class="k">MoM</span><span class="v" id="roM">—</span></div>
+  <div class="r"><span class="k">ERA</span><span class="v" id="roE">—</span></div>
+  <div class="r"><span class="k">VERDICT</span><span class="v" id="roV">—</span></div>
+  <div class="r"><span class="k">ORACLE NAV</span><span class="v" id="roN">—</span></div>
+</div>
+<div id="evlog"></div>
+
+<div id="date">—<small>WORLD BANK PINK SHEET · BANANA, US $/KG</small></div>
+
+<div id="strip"><div class="h">CHRONOLOGICAL SUMMARY 1960–2026</div>
+  <canvas id="stripcv"></canvas></div>
+
+<div id="tr">
+  <button class="btn on" id="bPlay">❚❚ PAUSE</button>
+  <button class="btn" id="bSpeed">1x</button>
+  <input type="range" id="scrub" min="0" max="1000" value="0">
+</div>
+<div id="hint">SPACE=再生/停止 · 停止中はドラッグで周回 · ←→=移動</div>
+
+<script src="data/chronicle_data.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const C=window.CHRONICLE, S=C.series, N=S.length;
+const months=S.map(d=>d.m), mi=ym=>months.indexOf(ym);
+const EV=[
+ ["1971-08","ニクソン・ショック","w"],["1973-10","第一次石油危機","w"],
+ ["1974-03","UPEB・輸出税闘争","b"],["1974-09","ハリケーン・フィフィ","b"],
+ ["1975-04","バナナゲート事件","b"],["1993-07","米欧バナナ貿易戦争","b"],
+ ["1998-10","ハリケーン・ミッチ","b"],["2000-01","エクアドル ドル化","w"],
+ ["2008-09","世界金融危機","w"],["2018-10","スミフル争議","b"],
+ ["2019-08","TR4 コロンビア上陸","b"],["2020-03","COVID-19","w"],
+ ["2022-02","ウクライナ侵攻・肥料高騰","w"],["2022-08","ピーク $1.67","p"],
+ ["2023-08","パナマ運河渇水","w"],["2024-10","ILA港湾スト","w"],
+ ["2024-12","底値 $0.83","p"],["2025-01","ILA再スト期限 +34%","b"],
+];
+const EVC={w:0x38bdf8,b:0xFFB627,p:0xFFD46A};
+
+/* ================= scene ================= */
+const SP=1.15, Z=i=>-i*SP;                 // month i -> z
+const HY=p=>p*22;                          // price -> height
+const app=document.getElementById('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+app.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#05070d');
+scene.fog=new THREE.Fog('#05070d',90,340);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,800);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.enabled=false;
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(800,600),.7,.5,.78));
+composer.addPass(new OutputPass());
+
+const grid=new THREE.GridHelper(2000,160,0x18203a,0x0d1322);
+grid.position.set(0,0,-N*SP/2); scene.add(grid);
+
+/* price wall: instanced bars, colored by era */
+const eraOf=i=>{const m=months[i];
+  if(m>=C.eras.live[0])return 2; if(m>=C.eras.finetune[0])return 1; return 0;};
+const ERACOL=[new THREE.Color('#2c4270'),new THREE.Color('#3f639c'),new THREE.Color('#FFB627')];
+const bar=new THREE.InstancedMesh(
+  new THREE.BoxGeometry(1.6,1,SP*0.72),
+  new THREE.MeshBasicMaterial({transparent:true,opacity:.92}),N);
+const M=new THREE.Matrix4();
+for(let i=0;i<N;i++){
+  const h=HY(S[i].p);
+  M.makeScale(1,h,1); M.setPosition(0,h/2,Z(i));
+  bar.setMatrixAt(i,M);
+  bar.setColorAt(i,ERACOL[eraOf(i)].clone().multiplyScalar(eraOf(i)===2?1:.9));
+}
+scene.add(bar);
+/* crest line */
+{
+  const pts=S.map((d,i)=>new THREE.Vector3(0,HY(d.p)+.3,Z(i)));
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0xFFE7A0,transparent:true,opacity:.95})));
+}
+
+/* event pylons + sprite labels */
+function label(text,color,scale=1){
+  const pad=8,fs=26, cv=document.createElement('canvas'), cx=cv.getContext('2d');
+  cx.font=`${fs}px 'JetBrains Mono',monospace`;
+  cv.width=Math.ceil(cx.measureText(text).width)+pad*2; cv.height=fs+pad*2;
+  const c2=cv.getContext('2d');
+  c2.font=`${fs}px 'JetBrains Mono',monospace`; c2.textBaseline='middle';
+  c2.lineWidth=5; c2.strokeStyle='rgba(0,0,0,.9)'; c2.strokeText(text,pad,cv.height/2);
+  c2.fillStyle=color; c2.fillText(text,pad,cv.height/2);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),
+    transparent:true,depthWrite:false}));
+  sp.scale.set(cv.width*0.035*scale,cv.height*0.035*scale,1);
+  return sp;
+}
+EV.forEach(([m,txt,c])=>{
+  const i=mi(m); if(i<0)return;
+  const h=HY(S[i].p), top=h+9;
+  const py=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,top,6),
+    new THREE.MeshBasicMaterial({color:EVC[c],transparent:true,opacity:.75}));
+  py.position.set(3.2,top/2,Z(i)); scene.add(py);
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(.5,10,8),
+    new THREE.MeshBasicMaterial({color:EVC[c]}));
+  dot.position.set(3.2,top,Z(i)); scene.add(dot);
+  const lb=label(`${m}  ${txt}`,'#'+new THREE.Color(EVC[c]).getHexString());
+  lb.position.set(3.2,top+2.6,Z(i)); scene.add(lb);
+});
+
+/* genealogy anchors */
+C.anchors.forEach(a=>{const i=mi(a); if(i<0)return;
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(.9,2.2,4),
+    new THREE.MeshBasicMaterial({color:0xFFB627}));
+  cone.position.set(2.3,1.1,Z(i)); scene.add(cone);});
+
+/* live: oracle pearls + nav ribbon beside the wall */
+const lm=C.live.months;
+{
+  const pts=[];
+  lm.forEach((m,k)=>{
+    const i=mi(m); const y=6+(C.live.oracle[k]-1)*60;
+    pts.push(new THREE.Vector3(7,y,Z(i)));
+    const held=C.live.verdict[k]==='GLD';
+    const p=held?new THREE.Mesh(new THREE.SphereGeometry(.75,14,10),
+        new THREE.MeshBasicMaterial({color:0xFFD46A}))
+      :new THREE.Mesh(new THREE.TorusGeometry(1,.12,8,24),
+        new THREE.MeshBasicMaterial({color:0x56718f}));
+    p.position.set(7,y,Z(i)); scene.add(p);
+  });
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0xFFC23D})));
+  const lb=label('GOLD ORACLE 1.3113x','#FFD46A',1.2);
+  lb.position.copy(pts[pts.length-1]).add(new THREE.Vector3(0,4,0)); scene.add(lb);
+}
+
+/* analogy arcs across the canyon of time */
+C.analogy.forEach((a,k)=>{
+  const i1=mi(a.from+"-01">""?a.from:a.from), i2=mi(a.to);
+  const p1=new THREE.Vector3(0,HY(S[mi(a.from)].p)+6,Z(mi(a.from)));
+  const p2=new THREE.Vector3(0,HY(S[i2].p)+6,Z(i2));
+  const mid=p1.clone().add(p2).multiplyScalar(.5); mid.y=46+k*10;
+  const curve=new THREE.QuadraticBezierCurve3(p1,mid,p2);
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(120)),
+    new THREE.LineDashedMaterial({color:0xFFD46A,dashSize:1.6,gapSize:1.2,
+      transparent:true,opacity:.8}));
+  line.computeLineDistances(); scene.add(line);
+  const lb=label(`表現空間の類推 cos ${a.cos} → ${a.to}`,'#FFD46A');
+  lb.position.copy(mid).add(new THREE.Vector3(0,2.5,0)); scene.add(lb);
+});
+
+/* ================= right strip ================= */
+const scv=document.getElementById('stripcv');
+function drawStrip(cur){
+  const r=scv.getBoundingClientRect(), dpr=Math.min(devicePixelRatio,2);
+  if(r.height<40||r.width<40){requestAnimationFrame(()=>drawStrip(cur));return;}
+  scv.width=r.width*dpr; scv.height=r.height*dpr;
+  const c=scv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
+  const W=r.width,H=r.height, rh=H/N;
+  for(let i=0;i<N;i++){
+    const e=eraOf(i);
+    c.fillStyle=e===2?'#FFB627':(e===1?'#33507c':'#233252');
+    c.globalAlpha=e===2?.95:.8;
+    c.fillRect(0,i*rh,(S[i].p/2)*(W-46),Math.max(rh-.4,.6));
+  }
+  c.globalAlpha=1;
+  EV.forEach(([m])=>{const i=mi(m); if(i<0)return;
+    c.fillStyle='#FFD46A'; c.fillRect((S[i].p/2)*(W-46)+2,i*rh-.5,4,1.6);});
+  // cursor
+  c.fillStyle='#fff'; c.fillRect(0,cur*rh-.7,W-40,1.4);
+  c.font='9px Menlo,monospace'; c.fillStyle='#c8cdda';
+  c.fillText(months[cur],W-42,cur*rh+3);
+  // decade labels
+  c.fillStyle='#5a6478';
+  for(let y=1960;y<=2020;y+=10){const i=mi(y+"-01"); if(i<0)continue;
+    c.fillText("'"+String(y).slice(2),W-24,i*rh+3);}
+}
+
+/* ================= event log (left) ================= */
+const evlog=document.getElementById('evlog');
+evlog.innerHTML=EV.map(([m,t,c],k)=>`<div class="e" id="ev${k}">${m} ${t}</div>`).join('');
+
+/* ================= playback ================= */
+let cur=0, playing=true, speed=1;
+const DUR=75;                            // seconds for full traverse at 1x
+const $=id=>document.getElementById(id);
+function setCur(i){
+  cur=Math.max(0,Math.min(N-1,Math.round(i)));
+  $('scrub').value=Math.round(cur/(N-1)*1000);
+  const d=S[cur], prev=cur>0?S[cur-1].p:d.p, mom=(d.p/prev-1)*100;
+  $('date').childNodes[0].nodeValue=d.m.replace('-','.');
+  $('roP').textContent='$'+d.p.toFixed(2)+'/kg';
+  $('roM').textContent=(mom>=0?'+':'')+mom.toFixed(1)+'%';
+  $('roM').className='v '+(mom>=0?'up':'dn');
+  $('roE').textContent=['PRETRAIN 1960–2013','FINETUNE 2010–2025','LIVE'][eraOf(cur)];
+  const li=lm.indexOf(d.m);
+  $('roV').textContent=li>=0?(C.live.verdict[li]==='GLD'?'金':'無'):'—';
+  $('roV').className='v '+(li>=0?(C.live.verdict[li]==='GLD'?'am':'cs'):'');
+  $('roN').textContent=li>=0?C.live.oracle[li].toFixed(4)+'x':'—';
+  EV.forEach(([m],k)=>{const i=mi(m);
+    $('ev'+k).className='e'+(Math.abs(i-cur)<14?' hot':'');});
+  if(!playing){const z=Z(cur);
+    controls.target.set(0,10,z); camera.position.set(32,26,z+46);}
+  drawStrip(cur);
+}
+$('bPlay').onclick=()=>{playing=!playing;
+  $('bPlay').textContent=playing?'❚❚ PAUSE':'▶ PLAY';
+  $('bPlay').classList.toggle('on',playing);
+  controls.enabled=!playing;
+  if(!playing){const z=Z(cur);
+    controls.target.set(0,10,z); camera.position.set(32,26,z+46); }
+};
+$('bSpeed').onclick=()=>{speed=speed===4?1:speed*2;$('bSpeed').textContent=speed+'x';};
+$('scrub').oninput=e=>{setCur(+e.target.value/1000*(N-1));};
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();$('bPlay').click();}
+  if(e.key==='ArrowRight')setCur(cur+3); if(e.key==='ArrowLeft')setCur(cur-3);
+});
+
+/* camera rig */
+function rig(){
+  const z=Z(cur);
+  const sway=Math.sin(cur*0.02)*4;
+  camera.position.lerp(new THREE.Vector3(24+sway,20+Math.sin(cur*0.013)*3,z+40),0.06);
+  camera.lookAt(0,10,z-38);
+}
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
+});
+
+let last=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=(now-last)/1000; last=now;
+  if(playing){
+    setCur(cur+dt/DUR*speed*(N-1)/1);
+    if(cur>=N-1){playing=false;$('bPlay').click();$('bPlay').click();playing=false;
+      $('bPlay').textContent='▶ PLAY';$('bPlay').classList.remove('on');controls.enabled=true;
+      const z=Z(cur); controls.target.set(0,8,z); camera.position.set(26,18,z+30);}
+    rig();
+  }else controls.update();
+  composer.render();
+}
+camera.position.set(20,16,Z(0)+34); camera.lookAt(0,9,Z(0)-40);
+setCur(0);
+requestAnimationFrame(loop);
+</script>
