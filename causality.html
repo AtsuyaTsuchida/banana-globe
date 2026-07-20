@@ -96,7 +96,7 @@ C.verdicts.forEach(v=>{
 
 /* ---------- nodes ---------- */
 /* column headers */
-[[X.ev,'① 世界の出来事','リサーチ · 確度ラベル'],[X.an,'② バナナ価格の変動','消去実験が特定した記憶の月'],
+[[X.ev,'① 世界の出来事','リサーチ · 確度ラベル'],[X.an,'② バナナ価格の変動','入力窓＝直近96ヶ月の中で効いた月'],
  [X.vd,'③ 託宣','金か、無か（12ヶ月）'],[X.out,'④ 損益','台帳の事実']]
 .forEach(([x,t,s])=>{
   put(`<text x="${x}" y="${TOP-28}" text-anchor="middle" fill="#fff" font-size="12"
@@ -147,6 +147,18 @@ put(`<g class="N out">
   <text x="${X.out+14}" y="${outY+4}" text-anchor="middle" fill="#fff" font-size="19" ${MONO}>${C.nav.toFixed(4)}x</text>
   <text x="${X.out+14}" y="${outY+26}" text-anchor="middle" fill="${css('pos')}" font-size="11" ${MONO}>+¥${C.pnl.toLocaleString()}</text>
 </g>`);
+/* pretrain background memory: acts on all verdicts, not decomposable by month */
+{
+  const y=H-52;
+  put(`<path d="M${X.an+150},${y-12} C${(X.an+X.vd)/2},${y-12} ${(X.an+X.vd)/2},${vdY[C.verdicts[11].m]} ${X.vd-90},${vdY[C.verdicts[11].m]}"
+    fill="none" stroke="#2a3348" stroke-width="14" opacity=".35" stroke-linecap="round"/>`);
+  put(`<g>
+    <rect x="${X.ev-130}" y="${y-30}" width="530" height="40" rx="4"
+      fill="#0a0e17" stroke="#1c2436" stroke-dasharray="3 3"/>
+    <text x="${X.ev-118}" y="${y-13}" fill="${css('ink')}" font-size="10">事前学習 1960–2013 — 798ヶ月の全歴史（重みの中の記憶）</text>
+    <text x="${X.ev-118}" y="${y+2}" fill="${css('dim')}" font-size="8.5" ${MONO}>全託宣に作用 · 月単位の寄与には分解不能（消去実験の対象は入力窓96ヶ月のみ） → 類推は latent.html</text>
+  </g>`);
+}
 /* legend */
 put(`<g ${MONO}>
   <line x1="${X.an+90}" y1="${H-46}" x2="${X.an+130}" y2="${H-46}" stroke="${css('amber')}" stroke-width="3"/>
@@ -161,7 +173,10 @@ document.getElementById('cap').innerHTML=
  `⚡は「上位の記憶をnヶ月消すと託宣の符号が反転する」ことを実測した判断。<br>`+
  `<b>リンク③（託宣→損益）は台帳の事実</b>（取引コスト0.1%控除後の月次リターン、緑=利益・赤=損失、太さ=|月次損益|）。`+
  `<b>リンク①（出来事→価格）は調査に基づく説明</b>で確度を明示：[確定]=文書化された因果 / [出典]=一次資料あり / [整合]=時期・機序が一致する最有力説明 / [観察]=系列上のパターン / [未調査]。<br>`+
- `注意：どのリンクも「託宣が正しかった」ことを意味しない（符号的中率43.8%）。この図が示すのは判断の由来であり、判断の妥当性ではない。`;
+ `注意：どのリンクも「託宣が正しかった」ことを意味しない（符号的中率43.8%）。この図が示すのは判断の由来であり、判断の妥当性ではない。<br>`+
+ `<b>学習データの全範囲について</b>：モデルは1960〜2026年の798ヶ月で学習しているが、各託宣の入力は直近96ヶ月の窓であり、`+
+ `消去実験が月単位に分解できるのはこの窓の内側だけ。1960〜2013年の事前学習は重みとして全託宣に作用する（下段の破線ボックス）。`+
+ `遠い過去（1972・2004）との関係は表現空間の類推として latent.html で可視化している——それは因果ではなく類似の測定である。`;
 
 /* ---------- hover tracing ---------- */
 const sv=document.getElementById('sv');
