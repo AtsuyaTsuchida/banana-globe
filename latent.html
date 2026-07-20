@@ -1,0 +1,230 @@
+<meta charset="utf-8" />
+<title>LATENT BANANA — 記憶の潜在空間 · TBOW</title>
+<style>
+  :root{
+    --bg:#0b0806; --txt:#e8e2d6; --dim:#8a7f6c; --amber:#e8b25a;
+    --serif:'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif;
+    --mono:'JetBrains Mono',Menlo,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);overflow:hidden;color:var(--txt);
+    font-family:var(--serif)}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:2;background:
+    radial-gradient(90% 90% at 50% 46%, transparent 55%, rgba(5,3,1,.72) 100%)}
+
+  #ttl{position:fixed;top:30px;left:36px;z-index:10}
+  #ttl .a{font-size:15px;letter-spacing:.42em;color:var(--txt)}
+  #ttl .b{font-size:9px;letter-spacing:.3em;color:var(--dim);margin-top:8px;line-height:1.9}
+
+  /* annotations (Qosmo-style: thin leader + small serif) */
+  #svg{position:fixed;inset:0;z-index:5;pointer-events:none}
+  .ann{position:fixed;z-index:6;pointer-events:none;max-width:260px;
+    font-size:11px;line-height:1.75;letter-spacing:.06em;color:var(--txt);
+    text-shadow:0 0 6px #000}
+  .ann .s{display:block;font-size:9.5px;color:var(--dim);letter-spacing:.08em}
+  .ann.live{color:var(--amber)} .ann.live .s{color:#a8813f}
+  .ann.faded{opacity:.34}
+
+  #cap{position:fixed;left:36px;bottom:28px;z-index:10;max-width:520px;
+    font-size:9.5px;line-height:2;color:var(--dim);letter-spacing:.08em}
+  #hud{position:fixed;right:36px;bottom:28px;z-index:10;text-align:right;
+    font-family:var(--mono);font-size:8.5px;color:var(--dim);letter-spacing:.16em;line-height:2}
+</style>
+
+<div id="app"></div>
+<div id="vig"></div>
+<svg id="svg"></svg>
+<div id="ttl">
+  <div class="a">LATENT BANANA</div>
+  <div class="b">バナナの記憶の潜在空間 — 727の窓 · 1967–2026<br>
+    THE BANANA OF WALL STREET</div>
+</div>
+<div id="cap">
+  粒のひとつひとつは、モデルが見てきた96ヶ月の窓。荒れた時代の窓ほど大きく滲む。
+  金色は現在——12の生きた窓。細い線は、モデルの内部表現がいま最も近いと感じている過去への距離。
+  現在は、金本位制が終わった月々（1972）と、ハリケーンと貿易戦争の後（2004）の隣に立っている。
+</div>
+<div id="hud">REPRESENTATION SPACE (t-SNE) · DETERMINISTIC<br>DRAG=ORBIT · WHEEL=ZOOM</div>
+
+<script src="data/latent_data.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const L=window.LATENT, P=L.pts, NP=P.length;
+const SC=95;                                     // t-SNE unit -> world
+const liveSet=new Set(Object.keys(L.live).map(Number));
+
+/* ================= scene ================= */
+const app=document.getElementById('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+app.appendChild(renderer.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color('#0b0806');
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,4000);
+camera.position.set(30,-14,520);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=.05;
+controls.autoRotate=true; controls.autoRotateSpeed=.16;
+controls.minDistance=90; controls.maxDistance=900;
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(800,600),.55,.7,.62));
+composer.addPass(new OutputPass());
+
+const rng=(seed=>()=> (seed=(seed*1103515245+12345)&0x7fffffff)/0x7fffffff)(42);
+const gauss=()=> (rng()+rng()+rng()-1.5)*1.2;
+
+/* ---------- dust: each window is a cloud of micro-particles ---------- */
+const PER=46;
+function makeCloud(indices,isLive){
+  const n=indices.length*PER;
+  const pos=new Float32Array(n*3), ph=new Float32Array(n),
+        amp=new Float32Array(n), sz=new Float32Array(n);
+  let k=0;
+  for(const i of indices){
+    const p=P[i], r=(2.2+p.v*10)* (isLive?0.65:1);
+    for(let j=0;j<PER;j++){
+      pos[k*3]  =p.x*SC+gauss()*r;
+      pos[k*3+1]=p.y*SC+gauss()*r;
+      pos[k*3+2]=gauss()*r*.8;
+      ph[k]=rng()*6.28; amp[k]=.25+rng()*.8;
+      sz[k]=isLive?(2.4+rng()*2.6):(1.1+rng()*1.9);
+      k++;
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(ph,1));
+  g.setAttribute('aAmp',new THREE.BufferAttribute(amp,1));
+  g.setAttribute('aSize',new THREE.BufferAttribute(sz,1));
+  const mat=new THREE.ShaderMaterial({
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+    uniforms:{uT:{value:0},uC:{value:new THREE.Color(isLive?'#f4c169':'#cfd4de')},
+              uO:{value:isLive?.95:.55}},
+    vertexShader:`
+      attribute float aPhase,aAmp,aSize; uniform float uT;
+      varying float vTw;
+      void main(){
+        vec3 p=position;
+        p.x+=sin(uT*.35+aPhase)*aAmp; p.y+=cos(uT*.28+aPhase*1.7)*aAmp;
+        p.z+=sin(uT*.22+aPhase*2.3)*aAmp*.6;
+        vTw=.55+.45*sin(uT*.9+aPhase*3.1);
+        vec4 mv=modelViewMatrix*vec4(p,1.);
+        gl_PointSize=aSize*(240./-mv.z);
+        gl_Position=projectionMatrix*mv;
+      }`,
+    fragmentShader:`
+      uniform vec3 uC; uniform float uO; varying float vTw;
+      void main(){
+        float d=length(gl_PointCoord-.5);
+        float a=smoothstep(.5,.05,d)*uO*vTw;
+        gl_FragColor=vec4(uC,a);
+      }`});
+  const pt=new THREE.Points(g,mat); scene.add(pt); return mat;
+}
+const all=[...Array(NP).keys()];
+const matDust=makeCloud(all.filter(i=>!liveSet.has(i)),false);
+const matLive=makeCloud([...liveSet],true);
+
+/* ---------- NN links: thin threads from now to the chosen past ---------- */
+const linkObjs=[];
+L.links.forEach(l=>{
+  const a=P[l.a], b=P[l.b];
+  const A=new THREE.Vector3(a.x*SC,a.y*SC,0), B=new THREE.Vector3(b.x*SC,b.y*SC,0);
+  const mid=A.clone().add(B).multiplyScalar(.5); mid.z+=A.distanceTo(B)*.25+4;
+  const pts=new THREE.QuadraticBezierCurve3(A,mid,B).getPoints(50);
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0xe8b25a,transparent:true,opacity:.15}));
+  scene.add(line); linkObjs.push({line,pts});
+});
+
+/* ---------- annotations ---------- */
+const idxOf=m=>P.findIndex(p=>p.m===m);
+const liveArr=[...liveSet];
+const liveCx=liveArr.reduce((s,i)=>s+P[i].x,0)/liveArr.length;
+const liveCy=liveArr.reduce((s,i)=>s+P[i].y,0)/liveArr.length;
+const ANN=[
+ {x:liveCx,y:liveCy,dx:120,dy:-90,cls:'live',
+  t:'現在 — 12の生きた窓',s:'2025-08〜2026-07 · 託宣「金か、無か」の入力'},
+ {i:idxOf('1972-12'),dx:-30,dy:-130,cls:'live',
+  t:'1972-12に終わる窓',s:'8/12判断の最近傍 cos 0.92 · 金本位制の終わりの直後'},
+ {i:idxOf('2004-05'),dx:150,dy:60,cls:'live',
+  t:'2004-05に終わる窓',s:'4/12判断の最近傍 cos 0.91 · ミッチと貿易戦争の後'},
+ {i:idxOf('2022-09'),dx:-160,dy:80,cls:'',
+  t:'2022-09に終わる窓',s:'肥料危機のピーク $1.67 を含む'},
+ {i:idxOf('2008-10'),dx:130,dy:-70,cls:'',
+  t:'2008-10に終わる窓',s:'世界金融危機の秋'},
+ {i:idxOf('1998-12'),dx:-150,dy:-80,cls:'',
+  t:'1998-12に終わる窓',s:'ハリケーン・ミッチの直後'},
+ {i:idxOf('2020-04'),dx:140,dy:90,cls:'',
+  t:'2020-04に終わる窓',s:'COVID-19 物流停止'},
+ {i:idxOf('1975-06'),dx:-140,dy:70,cls:'',
+  t:'1975-06に終わる窓',s:'バナナゲートとUPEBの季節'},
+];
+const svg=document.getElementById('svg');
+const annEls=ANN.map(a=>{
+  const d=document.createElement('div'); d.className='ann '+(a.cls||'');
+  d.innerHTML=`${a.t}<span class="s">${a.s}</span>`;
+  document.body.appendChild(d);
+  const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+  ln.setAttribute('stroke',a.cls==='live'?'#e8b25a':'#8a7f6c');
+  ln.setAttribute('stroke-width','.7'); ln.setAttribute('opacity','.6');
+  svg.appendChild(ln);
+  const wx=(a.i!=null?P[a.i].x:a.x)*SC, wy=(a.i!=null?P[a.i].y:a.y)*SC;
+  return {el:d,ln,w:new THREE.Vector3(wx,wy,0),dx:a.dx,dy:a.dy};
+});
+const tmp=new THREE.Vector3();
+function syncAnn(){
+  svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+  annEls.forEach(a=>{
+    tmp.copy(a.w).project(camera);
+    const sx=(tmp.x*.5+.5)*innerWidth, sy=(-tmp.y*.5+.5)*innerHeight;
+    const off=tmp.z>1;
+    const lx=sx+a.dx, ly=sy+a.dy;
+    a.el.style.left=(a.dx>=0?lx:lx-a.el.offsetWidth)+'px';
+    a.el.style.top=(ly-10)+'px';
+    a.el.style.display=off?'none':'block';
+    a.ln.setAttribute('x1',sx); a.ln.setAttribute('y1',sy);
+    a.ln.setAttribute('x2',lx+(a.dx>=0?-6:6)); a.ln.setAttribute('y2',ly);
+    a.ln.setAttribute('display',off?'none':'block');
+  });
+}
+
+/* ---------- focus cycle: one thread breathes at a time ---------- */
+let focus=0;
+setInterval(()=>{focus=(focus+1)%linkObjs.length;},5200);
+
+/* ================= loop ================= */
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const t=clock.getElapsedTime();
+  matDust.uniforms.uT.value=t; matLive.uniforms.uT.value=t;
+  linkObjs.forEach((l,k)=>{
+    l.line.material.opacity=k===focus? .32+.25*Math.sin(t*2.4) : .12;
+  });
+  controls.update();
+  composer.render();
+  syncAnn();
+}
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
+});
+loop();
+</script>
