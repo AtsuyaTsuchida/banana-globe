@@ -525,7 +525,7 @@ function buildLens3(){
     const u=0.10+ i*(0.80/(N-1));
     const p=pts[Math.floor(u*(pts.length-1))].clone().multiplyScalar(1.004);
     L(3,p,`<span class="d"></span>${mo.m==='26-03'?'回避 −11.05%':'被弾 −11.68%'}`,
-      mo.m==='26-03'?'exp':'evt',mo.m==='26-03'?-14:16);
+      mo.m==='26-03'?'exp':'evt',-16);
   });
   L(3,toVec(LONDON.lat,LONDON.lon,R+.02),
     `ORACLE ${ORC.nav.toFixed(4)}<span style="font-size:10px">x</span><span class="sub">金 ${ORC.months.filter(x=>x.pos==='GLD').length}/${ORC.months.length}ヶ月 · ${ORC.pnl>=0?'+':'−'}¥${Math.abs(ORC.pnl).toLocaleString()}</span>`,'focal',-40);
