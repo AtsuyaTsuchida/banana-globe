@@ -1,0 +1,203 @@
+<meta charset="utf-8" />
+<title>BANANA CHRONICLE — 学習データ・取引・世界情勢の統合年表</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:#0a0e17; --border:#1c2436;
+    --amber:#FFB627; --amber2:#B07E1E; --bright:#FFD46A; --dim:#5a6478;
+    --cash:#56718f; --pos:#22c55e; --neg:#ef4444; --neu:#38bdf8;
+    --grid:#151b2a; --txt:#c8cdda; --ink:#8b93a7;
+    --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
+    --sans:'Helvetica Neue','Hiragino Kaku Gothic ProN',Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:12px}
+  #hdr{padding:26px 40px 8px;display:flex;justify-content:space-between;align-items:baseline}
+  #hdr .t{font-size:18px;letter-spacing:.26em;color:#fff;font-weight:300}
+  #hdr .t small{display:block;font-size:8.5px;letter-spacing:.3em;color:var(--amber2);margin-top:6px}
+  #hdr .r{font-family:var(--mono);font-size:9px;color:var(--dim);text-align:right;letter-spacing:.14em}
+  #legend{display:flex;gap:20px;padding:6px 40px 2px;font-family:var(--mono);
+    font-size:9.5px;color:var(--ink);flex-wrap:wrap}
+  #legend .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  #legend .ln{display:inline-block;width:16px;height:0;border-top:2px solid;margin-right:6px;vertical-align:3px}
+  svg{display:block;width:100%;height:auto}
+  #wrap{padding:0 12px 30px}
+  .cap{padding:4px 40px 20px;font-family:var(--mono);font-size:9px;color:var(--dim);
+    letter-spacing:.05em;line-height:1.9}
+</style>
+
+<div id="hdr">
+  <div class="t">BANANA CHRONICLE<small>THE BANANA OF WALL STREET — 学習データ・取引・世界情勢の統合年表 1960–2026</small></div>
+  <div class="r">SOURCE: WORLD BANK PINK SHEET (798 MONTHS) · GOLD ORACLE LEDGER<br>
+    GENEALOGY (ERASURE) · ANALOGY (REPRESENTATION NN) · ALL DETERMINISTIC</div>
+</div>
+<div id="legend">
+  <span><span class="ln" style="border-color:var(--amber)"></span>バナナ価格 Banana, US $/kg</span>
+  <span><span class="sw" style="background:var(--neu)"></span>世界情勢</span>
+  <span><span class="sw" style="background:var(--amber)"></span>バナナ世界の出来事</span>
+  <span><span class="sw" style="background:var(--bright)"></span>価格の事件</span>
+  <span><span class="sw" style="background:#ffb62733"></span>▲ 判断を動かした月（消去実験）</span>
+  <span><span class="ln" style="border-color:var(--bright);border-top-style:dashed"></span>表現空間の類推（現在→過去）</span>
+</div>
+
+<div id="wrap"><svg id="sv" viewBox="0 0 1680 900"></svg></div>
+<div class="cap" id="cap"></div>
+
+<script src="data/chronicle_data.js"></script>
+<script>
+const C=window.CHRONICLE;
+const S=[], W=1680, H=900, L=54, R=1640;
+const put=s=>S.push(s);
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue('--'+n).trim();
+const MONO="font-family:'JetBrains Mono',Menlo,monospace";
+
+const months=C.series.map(d=>d.m);
+const mi=ym=>{const i=months.indexOf(ym);return i<0?null:i};
+const X=i=>L+(R-L)*i/(months.length-1);
+const Xm=ym=>X(mi(ym));
+
+/* ============ BAND A: 1960-2026 price line ============ */
+const A={t:150,b:380};
+const pmax=2.0, Y=p=>A.b-(A.b-A.t)*p/pmax;
+
+// era bands
+function era(a,b,color,label,ly){
+  put(`<rect x="${Xm(a)}" y="${A.t-8}" width="${Xm(b)-Xm(a)}" height="${A.b-A.t+8}" fill="${color}"/>`);
+  put(`<text x="${Xm(a)+6}" y="${ly}" fill="${css('dim')}" font-size="9" ${MONO} letter-spacing="2">${label}</text>`);
+}
+era("1960-01","2013-12","#0d1424","事前学習 PRETRAIN 1960–2013",A.t+14);
+era("2010-01","2025-07","#101a2e","ファインチューン 2010–2025",A.t+30);
+era("2025-08","2026-06","#ffb62712","LIVE",A.t+46);
+
+// y grid
+for(let p=0;p<=2;p+=0.5){
+  put(`<line x1="${L}" x2="${R}" y1="${Y(p)}" y2="${Y(p)}" stroke="${css('grid')}"/>`);
+  put(`<text x="${L-8}" y="${Y(p)+3}" text-anchor="end" fill="${css('dim')}" font-size="9" ${MONO}>$${p.toFixed(1)}</text>`);
+}
+// decade ticks
+for(let y=1960;y<=2025;y+=5){
+  const i=mi(y+"-01"); if(i==null)continue;
+  put(`<line x1="${X(i)}" x2="${X(i)}" y1="${A.b}" y2="${A.b+5}" stroke="#3a4256"/>`);
+  put(`<text x="${X(i)}" y="${A.b+18}" text-anchor="middle" fill="${css('dim')}" font-size="9" ${MONO}>${y}</text>`);
+}
+// price path
+put(`<path d="M${C.series.map((d,i)=>`${X(i).toFixed(1)},${Y(d.p).toFixed(1)}`).join('L')}"
+  fill="none" stroke="${css('amber')}" stroke-width="1.4"/>`);
+
+// genealogy anchors (gold triangles)
+C.anchors.forEach(a=>{
+  const x=Xm(a), y=Y(C.series[mi(a)].p);
+  put(`<path d="M${x-5},${A.b+34} L${x+5},${A.b+34} L${x},${A.b+26} Z" fill="${css('amber')}"/>`);
+  put(`<line x1="${x}" x2="${x}" y1="${y+4}" y2="${A.b+24}" stroke="${css('amber')}" stroke-width=".5" opacity=".5"/>`);
+});
+put(`<text x="${Xm("2023-06")}" y="${A.b+46}" text-anchor="end" fill="${css('amber2')}" font-size="9" ${MONO}>▲ 判断を動かした月（消去実験で特定）→</text>`);
+
+/* ============ events ============ */
+const EV=[  // [month, label, lane, row, anchor]
+ ["1971-08","ニクソン・ショック（金＝ドル交換停止）","w",0,"m"],
+ ["1973-10","第一次石油危機","w",1,"m"],
+ ["1974-03","UPEB結成・バナナ輸出税闘争","b",2,"m"],
+ ["1974-09","ハリケーン・フィフィ","b",3,"m"],
+ ["1975-04","バナナゲート事件","b",1,"s"],
+ ["1993-07","米欧バナナ貿易戦争はじまる","b",0,"m"],
+ ["1998-10","ハリケーン・ミッチ","b",1,"m"],
+ ["2000-01","エクアドル ドル化","w",2,"m"],
+ ["2008-09","世界金融危機","w",0,"m"],
+ ["2018-10","スミフル争議","b",0,"e"],
+ ["2019-08","TR4 コロンビア上陸","b",1,"e"],
+ ["2020-03","COVID-19","w",2,"m"],
+ ["2022-02","ウクライナ侵攻→肥料高騰","w",3,"e"],
+ ["2022-08","ピーク $1.67","p",1,"s"],
+ ["2023-08","パナマ運河渇水","w",5,"e"],
+ ["2024-10","ILA港湾スト（第一次）","w",0,"e"],
+ ["2024-12","底値 $0.83","p",2,"e"],
+ ["2025-01","ILA再スト期限→+34%","b",4,"e"],
+];
+const evc={w:css('neu'),b:css('amber'),p:css('bright')};
+EV.forEach(([m,label,c,row,anc])=>{
+  const i=mi(m); if(i==null)return;
+  const x=X(i), y=Y(C.series[i].p), ly=138-row*16;
+  const ta=anc==='e'?'end':(anc==='s'?'start':'middle');
+  const tx=anc==='e'?x-4:(anc==='s'?x+4:x);
+  put(`<line x1="${x}" x2="${x}" y1="${ly+4}" y2="${y-4}" stroke="${evc[c]}" stroke-width=".5" opacity=".45"/>`);
+  put(`<circle cx="${x}" cy="${y}" r="2.6" fill="${evc[c]}"/>`);
+  put(`<text x="${tx}" y="${ly}" text-anchor="${ta}" fill="${evc[c]}" font-size="8.5" ${MONO}>${esc(label)}</text>`);
+});
+
+/* ============ analogy arcs ============ */
+C.analogy.forEach((a,k)=>{
+  const x1=Xm(a.from), x2=Xm(a.to), apex=14+k*12, ey=44;
+  put(`<path d="M${x1},${ey} Q${(x1+x2)/2},${apex} ${x2},${ey}"
+    fill="none" stroke="${css('bright')}" stroke-width="1" stroke-dasharray="5 4" opacity=".8"/>`);
+  put(`<circle cx="${x2}" cy="${ey}" r="3" fill="none" stroke="${css('bright')}"/>`);
+  put(`<text x="${x2+8}" y="${ey-8+k*0}" text-anchor="start" fill="${css('bright')}" font-size="9" ${MONO}>${a.to}〜 · ${a.label} · cos ${a.cos}</text>`);
+});
+put(`<text x="${L}" y="16" fill="${css('dim')}" font-size="9" ${MONO}>モデルの内部表現が「現在に最も似ている」と処理した過去 →</text>`);
+
+/* ============ cohort bracket ============ */
+{
+  const x1=Xm(C.cohort.span[0].slice(0,7)), x2=Xm(C.cohort.span[1].slice(0,7)), y=A.b+62;
+  put(`<path d="M${x1},${y} L${x1},${y+6} L${x2},${y+6} L${x2},${y}" fill="none" stroke="#3a4256"/>`);
+  put(`<text x="${x2}" y="${y+22}" text-anchor="end" fill="${css('ink')}" font-size="9" ${MONO}>従来型アルゴ比較（バックテスト 2014–2025）: MULTIFACTOR(VIX·金利·ドル·油) ${C.cohort.MULTIFACTOR}x ／ SPY ${C.cohort.SPY}x ／ RANDOM ${C.cohort.RANDOM}x ／ BANANA ${C.cohort.BANANA}x</text>`);
+}
+
+/* ============ BAND B: live 12-month zoom ============ */
+const B={t:560,b:790,l:150,r:1450};
+const lm=C.live.months, n=lm.length;
+const bx=i=>B.l+(B.r-B.l)*i/(n-1);
+const allv=[...C.live.oracle,...C.live.mom3,...C.live.tsmom12,...C.live.ma200,...C.live.bh];
+const vmin=Math.min(...allv,1)*0.99, vmax=Math.max(...allv)*1.01;
+const by=v=>B.b-(B.b-B.t)*(v-vmin)/(vmax-vmin);
+
+// connector from live region
+put(`<path d="M${Xm("2025-08")},${A.b+8} L${B.l},${B.t-24} M${Xm("2026-06")},${A.b+8} L${B.r},${B.t-24}"
+  stroke="#2a3348" stroke-width="1" stroke-dasharray="3 4"/>`);
+put(`<text x="${B.l}" y="${B.t-34}" fill="#fff" font-size="11" ${MONO} letter-spacing="2">GOLD ORACLE vs 通常のアルゴリズム — 同一12ヶ月・同一コスト・「金か、無か」</text>`);
+
+// grid + y labels
+for(let v=1.0;v<=vmax;v+=0.1){
+  put(`<line x1="${B.l}" x2="${B.r}" y1="${by(v)}" y2="${by(v)}" stroke="${css('grid')}"/>`);
+  put(`<text x="${B.l-8}" y="${by(v)+3}" text-anchor="end" fill="${css('dim')}" font-size="9" ${MONO}>${v.toFixed(1)}x</text>`);
+}
+// verdict hold bands
+lm.forEach((m,i)=>{
+  if(C.live.verdict[i]!=='GLD')return;
+  const x0=i===0?bx(0):(bx(i-1)+bx(i))/2, x1=i===n-1?bx(i):(bx(i)+bx(i+1))/2;
+  put(`<rect x="${x0}" y="${B.t}" width="${x1-x0}" height="${B.b-B.t}" fill="#ffb627" opacity=".05"/>`);
+});
+// lines
+function line(vals,color,w,dash,label,dy=0){
+  put(`<path d="M${vals.map((v,i)=>`${bx(i).toFixed(1)},${by(v).toFixed(1)}`).join('L')}"
+    fill="none" stroke="${color}" stroke-width="${w}" ${dash?`stroke-dasharray="${dash}"`:''}/>`);
+  put(`<text x="${B.r+10}" y="${by(vals[n-1])+3+dy}" fill="${color}" font-size="9.5" ${MONO}>${label} ${vals[n-1].toFixed(3)}x</text>`);
+}
+line(C.live.bh,'#3f4a61',1.2,'4 4','GLD持続',12);
+line(C.live.tsmom12,'#5a6478',1.4,null,'TSMOM-12',26);
+line(C.live.ma200,'#7986a0',1.4,null,'MA200',-14);
+line(C.live.mom3,css('neu'),1.6,null,'MOM-3',-26);
+line(C.live.oracle,css('amber'),2.4,null,'ORACLE',0);
+// verdict pearls + annotations
+lm.forEach((m,i)=>{
+  const held=C.live.verdict[i]==='GLD', x=bx(i), y=by(C.live.oracle[i]);
+  put(held?`<circle cx="${x}" cy="${y}" r="3.6" fill="${css('gold')||'#FFD46A'}" stroke="${css('bg')}" stroke-width="1.5"/>`
+          :`<circle cx="${x}" cy="${y}" r="4.4" fill="none" stroke="${css('cash')}" stroke-width="1.4"/>`);
+  put(`<text x="${x}" y="${B.b+16}" text-anchor="middle" fill="${css('dim')}" font-size="8.5" ${MONO}>${m.slice(2)}</text>`);
+  put(`<text x="${x}" y="${B.b+30}" text-anchor="middle" fill="${held?css('bright'):css('cash')}" font-size="8.5" ${MONO}>${held?'金':'無'}</text>`);
+});
+put(`<text x="${bx(7)}" y="${by(C.live.oracle[7])-14}" text-anchor="middle" fill="${css('pos')}" font-size="9" ${MONO}>回避 −11.05%</text>`);
+put(`<text x="${bx(10)}" y="${by(C.live.oracle[10])+22}" text-anchor="middle" fill="${css('neg')}" font-size="9" ${MONO}>被弾 −11.68%</text>`);
+put(`<text x="${B.l}" y="${B.b+30}" fill="${css('dim')}" font-size="8.5" ${MONO}>判断:</text>`);
+// live-period event flags
+[["2025-10","バナナ+11%急騰"],["2026-01","GLD +12.3%"]].forEach(([m,t])=>{
+  const i=lm.indexOf(m); if(i<0)return;
+  put(`<line x1="${bx(i)}" x2="${bx(i)}" y1="${B.t-4}" y2="${B.t-14}" stroke="${css('dim')}"/>`);
+  put(`<text x="${bx(i)}" y="${B.t-18}" text-anchor="middle" fill="${css('ink')}" font-size="8.5" ${MONO}>${t}</text>`);
+});
+
+document.getElementById('sv').innerHTML=S.join('');
+document.getElementById('cap').innerHTML=
+ `上段：世界銀行Pink Sheet「Banana, US」全798ヶ月（1960-01〜2026-06）。事前学習は1960〜2013、ファインチューンは2010〜2025、ライブ運用は2025-08〜。`+
+ `▲は消去実験で特定された「判断を動かした月」。破線の弧は表現空間の最近傍——モデルが現在の窓に最も似ていると処理した過去（1972-12〜1973-04へ8/12判断、2004年へ4/12判断）。<br>`+
+ `下段：同一12ヶ月・同一取引コスト(0.1%/変更)での比較。ORACLE=バナナ96ヶ月だけで判断／MOM-3・TSMOM-12・MA200=金自身の価格で判断する従来型ルール。`+
+ `すべての数値は決定論的に再現可能。検証の詳細は evidence.html・genealogy.json・analogy_nn.json を参照。`;
+</script>
