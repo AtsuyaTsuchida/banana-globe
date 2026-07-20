@@ -1,0 +1,181 @@
+<meta charset="utf-8" />
+<title>CAUSAL CHAIN — 出来事から損益までの因果</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:#0a0e17; --border:#1c2436;
+    --amber:#FFB627; --bright:#FFD46A; --amber2:#B07E1E; --dim:#5a6478;
+    --cash:#56718f; --pos:#22c55e; --neg:#ef4444; --neu:#38bdf8;
+    --txt:#c8cdda; --ink:#8b93a7;
+    --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
+    --sans:'Helvetica Neue','Hiragino Kaku Gothic ProN',Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:12px}
+  #hdr{padding:26px 40px 6px;display:flex;justify-content:space-between;align-items:baseline}
+  #hdr .t{font-size:18px;letter-spacing:.24em;color:#fff;font-weight:300}
+  #hdr .t small{display:block;font-size:8.5px;letter-spacing:.28em;color:var(--amber2);margin-top:6px}
+  #hdr .r{font-family:var(--mono);font-size:9px;color:var(--dim);text-align:right;letter-spacing:.12em;line-height:1.9}
+  svg{display:block;width:100%;height:auto}
+  #wrap{padding:0 12px}
+  .cap{padding:8px 40px 26px;font-family:var(--mono);font-size:9px;color:var(--dim);
+    line-height:1.9;letter-spacing:.04em}
+  .cap b{color:var(--txt);font-weight:400}
+</style>
+
+<div id="hdr">
+  <div class="t">CAUSAL CHAIN<small>THE BANANA OF WALL STREET — 出来事 → バナナ価格 → 託宣 → 損益 · 全リンク測定値つき</small></div>
+  <div class="r">LINK 2 = ERASURE-MEASURED (SEED 42) · LINK 3 = LEDGER FACT<br>
+    LINK 1 = RESEARCHED, CONFIDENCE LABELED · HOVER TO TRACE</div>
+</div>
+<div id="wrap"><svg id="sv" viewBox="0 0 1680 980"></svg></div>
+<div class="cap" id="cap"></div>
+
+<script src="data/causal_data.js"></script>
+<script>
+const C=window.CAUSAL;
+const S=[]; const put=s=>S.push(s);
+const MONO="font-family:'JetBrains Mono',Menlo,monospace";
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue('--'+n).trim();
+
+/* ---------- layout ---------- */
+const X={ev:150, an:520, vd:1010, out:1450};
+const TOP=70, H=980;
+
+/* events (link 1: researched causes, confidence labeled) */
+const EVENTS=[
+ {id:'fert', t:'ウクライナ侵攻 → 肥料・燃料危機', c:'確定',
+  to:['2022-08','2022-09','2022-11']},
+ {id:'canal',t:'パナマ運河渇水と正常化', c:'整合',
+  to:['2023-08','2024-07']},
+ {id:'glut', t:'エクアドル供給過剰（対米 +29.5%）', c:'出典',
+  to:['2024-11','2025-01']},
+ {id:'ila',  t:'ILA港湾スト危機（10月スト・1月期限）', c:'整合',
+  to:['2025-02']},
+ {id:'season',t:'季節サイクル（春高・夏安）', c:'観察',
+  to:['2024-07','2025-07']},
+ {id:'unk',  t:'原因未特定の変動', c:'未調査',
+  to:['2023-04','2023-05','2023-12','2024-02','2024-03','2024-04','2024-05','2025-10']},
+];
+const FACT={'2022-08':'$1.60台へ','2022-09':'ピーク $1.67','2022-11':'高値圏',
+ '2024-07':'−23% 暴落','2024-11':'$1.03 停滞','2025-01':'底値 $0.83',
+ '2025-02':'+34% 急騰','2025-07':'−16% 急落','2023-08':'運河制限期','2025-10':'+11%'};
+
+/* rows */
+const anMs=C.anchor_months;
+const anY={}; anMs.forEach((m,i)=>anY[m]=TOP+40+i*(790/(anMs.length-1)));
+const evY={}; EVENTS.forEach((e,i)=>evY[e.id]=TOP+70+i*140);
+const vdY={}; C.verdicts.forEach((v,i)=>vdY[v.m]=TOP+30+i*68);
+const outY=TOP+380;
+
+/* ---------- edges ---------- */
+function edge(x1,y1,x2,y2,w,color,dash,cls,op){
+  const mx=(x1+x2)/2;
+  put(`<path class="${cls}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
+    fill="none" stroke="${color}" stroke-width="${w}" opacity="${op}"
+    ${dash?`stroke-dasharray="${dash}"`:''}/>`);
+}
+/* link1: event -> anchor */
+EVENTS.forEach(e=>{
+  const dash=e.c==='確定'||e.c==='出典'?null:(e.c==='未調査'?'2 5':'6 5');
+  e.to.forEach(m=>{ if(anY[m]==null)return;
+    edge(X.ev+118,evY[e.id],X.an-64,anY[m],1.1,'#4a5468',dash,`E ev-${e.id} an-${m}`, .55);});
+});
+/* link2: anchor -> verdict (erasure-measured, signed) */
+C.verdicts.forEach(v=>{
+  [...v.sup,...v.opp].forEach(s=>{
+    const w=Math.max(.8,Math.abs(s.d)*130);
+    const col=s.d>0?css('amber'):css('cash');
+    edge(X.an+64,anY[s.m],X.vd-78,vdY[v.m],w,col,null,`E an-${s.m} vd-${v.m}`,.62);
+  });
+});
+/* link3: verdict -> outcome (ledger) */
+C.verdicts.forEach(v=>{
+  const w=Math.max(.8,Math.abs(v.net)*.62);
+  edge(X.vd+78,vdY[v.m],X.out-84,outY,w,v.net>=0?css('pos'):css('neg'),null,`E vd-${v.m} out`,.5);
+});
+
+/* ---------- nodes ---------- */
+/* column headers */
+[[X.ev,'① 世界の出来事','リサーチ · 確度ラベル'],[X.an,'② バナナ価格の変動','消去実験が特定した記憶の月'],
+ [X.vd,'③ 託宣','金か、無か（12ヶ月）'],[X.out,'④ 損益','台帳の事実']]
+.forEach(([x,t,s])=>{
+  put(`<text x="${x}" y="${TOP-28}" text-anchor="middle" fill="#fff" font-size="12"
+    letter-spacing="2" ${MONO}>${t}</text>`);
+  put(`<text x="${x}" y="${TOP-12}" text-anchor="middle" fill="${css('dim')}" font-size="8.5" ${MONO}>${s}</text>`);
+});
+/* events */
+EVENTS.forEach(e=>{
+  const y=evY[e.id];
+  put(`<g class="N ev-${e.id}">
+    <rect x="${X.ev-130}" y="${y-24}" width="248" height="48" rx="4"
+      fill="#0a0e17" stroke="#1c2436"/>
+    <text x="${X.ev-118}" y="${y-4}" fill="${css('txt')}" font-size="10.5">${e.t}</text>
+    <text x="${X.ev-118}" y="${y+13}" fill="${e.c==='確定'||e.c==='出典'?css('pos'):(e.c==='未調査'?css('dim'):css('warn')||'#eab308')}"
+      font-size="8.5" ${MONO}>[${e.c}]</text></g>`);
+});
+/* anchors */
+anMs.forEach(m=>{
+  const y=anY[m], big=FACT[m];
+  put(`<g class="N an-${m}">
+    <circle cx="${X.an}" cy="${y}" r="${big?5:3}" fill="${big?css('bright'):'#3a4a68'}"/>
+    <text x="${X.an-12}" y="${y+3}" text-anchor="end" fill="${big?css('bright'):css('dim')}"
+      font-size="${big?10:8.5}" ${MONO}>${m}</text>
+    ${big?`<text x="${X.an+12}" y="${y+3}" fill="${css('amber2')}" font-size="8.5" ${MONO}>${big}</text>`:''}
+  </g>`);
+});
+/* verdicts */
+C.verdicts.forEach(v=>{
+  const y=vdY[v.m], gold=v.pos==='GLD';
+  put(`<g class="N vd-${v.m}">
+    <rect x="${X.vd-76}" y="${y-22}" width="152" height="44" rx="4"
+      fill="#0a0e17" stroke="${gold?'#3a3220':'#1c2436'}"/>
+    <text x="${X.vd-64}" y="${y-5}" fill="${css('dim')}" font-size="9" ${MONO}>${v.m}</text>
+    <text x="${X.vd+18}" y="${y-4}" fill="${gold?css('bright'):css('cash')}" font-size="12">${gold?'金':'無'}</text>
+    <text x="${X.vd-64}" y="${y+13}" fill="${css('dim')}" font-size="8.5" ${MONO}>pred ${v.pred>=0?'+':''}${v.pred.toFixed(3)}</text>
+    <text x="${X.vd+64}" y="${y+13}" text-anchor="end" fill="${v.net>=0?css('pos'):css('neg')}"
+      font-size="9" ${MONO}>${v.net>=0?'+':''}${v.net}%</text>
+    ${v.flip?`<text x="${X.vd+76}" y="${y-27}" text-anchor="end" fill="${css('neu')}"
+      font-size="8" ${MONO}>⚡ ${v.flip}ヶ月の消去で反転</text>`:''}
+  </g>`);
+});
+/* outcome */
+put(`<g class="N out">
+  <rect x="${X.out-84}" y="${outY-46}" width="196" height="92" rx="5"
+    fill="#0f1320" stroke="#3a3220"/>
+  <text x="${X.out+14}" y="${outY-20}" text-anchor="middle" fill="${css('dim')}"
+    font-size="8.5" letter-spacing="2" ${MONO}>GOLD ORACLE · 12MO</text>
+  <text x="${X.out+14}" y="${outY+4}" text-anchor="middle" fill="#fff" font-size="19" ${MONO}>${C.nav.toFixed(4)}x</text>
+  <text x="${X.out+14}" y="${outY+26}" text-anchor="middle" fill="${css('pos')}" font-size="11" ${MONO}>+¥${C.pnl.toLocaleString()}</text>
+</g>`);
+/* legend */
+put(`<g ${MONO}>
+  <line x1="${X.an+90}" y1="${H-46}" x2="${X.an+130}" y2="${H-46}" stroke="${css('amber')}" stroke-width="3"/>
+  <text x="${X.an+138}" y="${H-42}" fill="${css('ink')}" font-size="9" ${MONO}>金へ押した記憶（Δpred&gt;0）</text>
+  <line x1="${X.an+330}" y1="${H-46}" x2="${X.an+370}" y2="${H-46}" stroke="${css('cash')}" stroke-width="3"/>
+  <text x="${X.an+378}" y="${H-42}" fill="${css('ink')}" font-size="9" ${MONO}>無へ引いた記憶（Δpred&lt;0）· 太さ=|寄与|</text>
+</g>`);
+
+document.getElementById('sv').innerHTML=S.join('');
+document.getElementById('cap').innerHTML=
+ `<b>リンク②（価格→託宣）は測定値</b>：入力96ヶ月から当該月を消して再推論した際のGLD予測の変化量（2消去方式で安定した月のみ、seed=42で再現可能）。線の太さ=|Δpred|。`+
+ `⚡は「上位の記憶をnヶ月消すと託宣の符号が反転する」ことを実測した判断。<br>`+
+ `<b>リンク③（託宣→損益）は台帳の事実</b>（取引コスト0.1%控除後の月次リターン、緑=利益・赤=損失、太さ=|月次損益|）。`+
+ `<b>リンク①（出来事→価格）は調査に基づく説明</b>で確度を明示：[確定]=文書化された因果 / [出典]=一次資料あり / [整合]=時期・機序が一致する最有力説明 / [観察]=系列上のパターン / [未調査]。<br>`+
+ `注意：どのリンクも「託宣が正しかった」ことを意味しない（符号的中率43.8%）。この図が示すのは判断の由来であり、判断の妥当性ではない。`;
+
+/* ---------- hover tracing ---------- */
+const sv=document.getElementById('sv');
+sv.addEventListener('mousemove',e=>{
+  const g=e.target.closest('g.N');
+  const all=[...sv.querySelectorAll('path.E')];
+  if(!g){all.forEach(p=>p.style.opacity='');
+    sv.querySelectorAll('g.N').forEach(n=>n.style.opacity=''); return;}
+  const cls=[...g.classList].filter(c=>c!=='N');
+  const on=p=>cls.some(c=>p.classList.contains(c));
+  all.forEach(p=>p.style.opacity=on(p)?'1':'0.07');
+  sv.querySelectorAll('g.N').forEach(n=>{
+    const share=[...n.classList].some(c=>c!=='N'&&(cls.includes(c)||
+      all.some(p=>on(p)&&p.classList.contains(c))));
+    n.style.opacity=share||n===g?'1':'0.25';});
+});
+</script>
